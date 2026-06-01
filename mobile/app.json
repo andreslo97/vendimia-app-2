@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Vendimia App 2.0",
+    "slug": "vendimia-app-2",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "vendimiaapp",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.vendimia.app2",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.vendimia.app2",
+      "adaptiveIcon": {
+        "backgroundColor": "#111111"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "676e03d3-c448-4e64-ab90-dd27060dba40"
+      }
+    }
+  }
+}
