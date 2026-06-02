@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
+import { ChurchLocationsHeader, getChurchLocationsHeader } from "@/services/churchLocationsService";
 import { getLeadershipScheduleHeader, LeadershipScheduleHeader } from "@/services/leadershipScheduleService";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
@@ -13,9 +14,11 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const { profile, user, signOut } = useAuth();
   const [scheduleHeader, setScheduleHeader] = useState<LeadershipScheduleHeader | null>(null);
+  const [locationsHeader, setLocationsHeader] = useState<ChurchLocationsHeader | null>(null);
 
   useEffect(() => {
     getLeadershipScheduleHeader().then(setScheduleHeader).catch(() => setScheduleHeader(null));
+    getChurchLocationsHeader().then(setLocationsHeader).catch(() => setLocationsHeader(null));
   }, []);
 
   const closeSession = async () => {
@@ -53,6 +56,18 @@ export default function MoreScreen() {
           </View>
           <View style={styles.flex}>
             <Text style={styles.menuTitle}>{scheduleHeader.menu_title}</Text>
+          </View>
+          <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+        </Pressable>
+      ) : null}
+
+      {locationsHeader?.menu_title ? (
+        <Pressable onPress={() => router.push("/(tabs)/more/locations" as never)} style={styles.menuItem}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="location" color={colors.gold} size={24} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.menuTitle}>{locationsHeader.menu_title}</Text>
           </View>
           <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
         </Pressable>

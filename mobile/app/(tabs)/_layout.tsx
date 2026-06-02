@@ -47,6 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="more/index" options={{ title: "Más", tabBarIcon: tabIcon("menu") }} />
       <Tabs.Screen name="more/info" options={{ href: null }} />
       <Tabs.Screen name="more/leadership-schedule" options={{ href: null }} />
+      <Tabs.Screen name="more/locations" options={{ href: null }} />
 
       <Tabs.Screen name="discipulado/devocionales" options={{ href: null }} />
       <Tabs.Screen name="discipulado/notas" options={{ href: null }} />
