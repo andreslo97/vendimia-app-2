@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -9,6 +9,8 @@ import { ChurchLocationsHeader, getChurchLocationsHeader } from "@/services/chur
 import { getLeadershipScheduleHeader, LeadershipScheduleHeader } from "@/services/leadershipScheduleService";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
+
+const PRIVACY_POLICY_URL = "https://andreslo97.github.io/iglesia-vendimia-privacy/";
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
@@ -72,6 +74,16 @@ export default function MoreScreen() {
           <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
         </Pressable>
       ) : null}
+
+      <Pressable onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} style={styles.menuItem}>
+        <View style={styles.menuIcon}>
+          <Ionicons name="shield-checkmark" color={colors.gold} size={24} />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.menuTitle}>Política de privacidad</Text>
+        </View>
+        <Ionicons name="open-outline" color={colors.textSecondary} size={20} />
+      </Pressable>
 
       <Pressable onPress={closeSession} style={styles.signOut}>
         <Ionicons name="log-out-outline" color={colors.background} size={20} />
