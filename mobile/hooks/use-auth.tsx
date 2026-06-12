@@ -10,6 +10,7 @@ type Profile = {
   full_name: string;
   email: string;
   role: string;
+  avatar_url: string | null;
 };
 
 type AuthContextValue = {
@@ -18,9 +19,11 @@ type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (fullName: string, email: string, password: string) => Promise<void>;
+  signUp: (fullName: string, email: string, password: string, avatarUri?: string) => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
+  updateProfileDetails: (fullName: string, email: string) => Promise<void>;
+  updateProfileAvatar: (imageUri: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -37,6 +40,25 @@ const getPasswordRecoveryRedirectUrl = () => {
   return nativePasswordRecoveryRedirectUrl;
 };
 
+const uploadProfileAvatar = async (userId: string, imageUri: string) => {
+  const imageResponse = await fetch(imageUri);
+  const imageBody = await imageResponse.arrayBuffer();
+  const storagePath = `${userId}/avatar-${Date.now()}.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("profile-avatars")
+    .upload(storagePath, imageBody, {
+      cacheControl: "3600",
+      contentType: "image/jpeg",
+      upsert: true
+    });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from("profile-avatars").getPublicUrl(storagePath);
+  return data.publicUrl;
+};
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -50,7 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id,full_name,email,role")
+      .select("id,full_name,email,role,avatar_url")
       .eq("id", userId)
       .maybeSingle();
 
@@ -85,8 +107,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
-      signUp: async (fullName, email, password) => {
-        const { error } = await supabase.auth.signUp({
+      signUp: async (fullName, email, password, avatarUri) => {
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -97,6 +119,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
           }
         });
         if (error) throw error;
+
+        if (avatarUri && data.user && data.session) {
+          const avatarUrl = await uploadProfileAvatar(data.user.id, avatarUri);
+
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .update({ avatar_url: avatarUrl })
+            .eq("id", data.user.id);
+
+          if (profileError) throw profileError;
+          await loadProfile(data.user.id);
+        }
 
         supabase.functions
           .invoke("send-registration-email", {
@@ -116,6 +150,51 @@ export function AuthProvider({ children }: PropsWithChildren) {
       updatePassword: async (password) => {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
+
+        if (session?.user.id) {
+          await supabase.from("profile_change_logs").insert({
+            user_id: session.user.id,
+            changed_by: session.user.id,
+            field_name: "password",
+            old_value: null,
+            new_value: "updated"
+          });
+        }
+      },
+      updateProfileDetails: async (fullName, email) => {
+        if (!session?.user.id) throw new Error("No active user session.");
+
+        const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
+        const normalizedEmail = email.trim().toLowerCase();
+
+        if (normalizedEmail !== session.user.email) {
+          const { error: authError } = await supabase.auth.updateUser({ email: normalizedEmail });
+          if (authError) throw authError;
+        }
+
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            full_name: normalizedFullName,
+            email: normalizedEmail
+          })
+          .eq("id", session.user.id);
+
+        if (profileError) throw profileError;
+        await loadProfile(session.user.id);
+      },
+      updateProfileAvatar: async (imageUri) => {
+        if (!session?.user.id) throw new Error("No active user session.");
+
+        const avatarUrl = await uploadProfileAvatar(session.user.id, imageUri);
+
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ avatar_url: avatarUrl })
+          .eq("id", session.user.id);
+
+        if (updateError) throw updateError;
+        await loadProfile(session.user.id);
       },
       signOut: async () => {
         const { error } = await supabase.auth.signOut();

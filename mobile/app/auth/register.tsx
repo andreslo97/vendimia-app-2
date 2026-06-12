@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { Link, Redirect, router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -21,11 +22,36 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && session) return <Redirect href="/(tabs)" />;
+
+  const selectProfilePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert("Permiso requerido", "Necesitamos acceso a tus fotos para agregar tu foto de perfil.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ["images"],
+        quality: 0.82
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch {
+      Alert.alert("Error", "No fue posible seleccionar la foto.");
+    }
+  };
 
   const onSubmit = async () => {
     try {
@@ -41,7 +67,7 @@ export default function RegisterScreen() {
         return;
       }
 
-      await signUp(normalizedFullName, email.trim(), password);
+      await signUp(normalizedFullName, email.trim(), password, avatarUri ?? undefined);
       setSuccessMessage(registrationSuccessMessage);
       Alert.alert("Registro exitoso", registrationSuccessMessage, [
         {
@@ -71,6 +97,17 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.panel}>
+          <Pressable onPress={selectProfilePhoto} style={styles.avatarPicker}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarPreview} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="camera" color={colors.gold} size={28} />
+              </View>
+            )}
+            <Text style={styles.avatarText}>{avatarUri ? "Cambiar foto de perfil" : "Agregar foto de perfil (opcional)"}</Text>
+          </Pressable>
+
           <View style={styles.inputWrap}>
             <Ionicons name="person" color={colors.gold} size={20} />
             <TextInput
@@ -173,6 +210,31 @@ const styles = StyleSheet.create({
   },
   panel: {
     gap: 14
+  },
+  avatarPicker: {
+    alignItems: "center",
+    gap: 10,
+    paddingBottom: 2
+  },
+  avatarPlaceholder: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.cardDark,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  avatarPreview: {
+    width: 82,
+    height: 82,
+    borderRadius: 41
+  },
+  avatarText: {
+    color: colors.gold,
+    fontSize: 14,
+    fontFamily: fonts.bold
   },
   inputWrap: {
     minHeight: 54,

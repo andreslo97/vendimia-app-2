@@ -46,6 +46,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="events" options={{ title: "Eventos", tabBarIcon: tabIcon("calendar") }} />
       <Tabs.Screen name="more/index" options={{ title: "Más", tabBarIcon: tabIcon("menu") }} />
       <Tabs.Screen name="more/info" options={{ href: null }} />
+      <Tabs.Screen name="more/profile" options={{ href: null }} />
       <Tabs.Screen name="more/leadership-schedule" options={{ href: null }} />
       <Tabs.Screen name="more/locations" options={{ href: null }} />
 
@@ -54,7 +55,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="discipulado/material/index" options={{ href: null }} />
       <Tabs.Screen name="discipulado/material/[id]" options={{ href: null }} />
       <Tabs.Screen name="discipulado/biblia/index" options={{ href: null }} />
-      <Tabs.Screen name="discipulado/biblia/[id]" options={{ href: null }} />
+      <Tabs.Screen name="discipulado/biblia/[id]" options={{ href: null, tabBarStyle: { display: "none" } }} />
     </Tabs>
   );
 }
