@@ -18,3 +18,5 @@ mobile/.env
 mobile/.env*.local
 mobile/ios/
 mobile/android/
+
+supabase/.temp/

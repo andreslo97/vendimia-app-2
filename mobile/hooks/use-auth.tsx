@@ -3,6 +3,7 @@ import * as Linking from "expo-linking";
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 
+import { registerPushToken } from "@/services/pushNotificationsService";
 import { supabase } from "@/services/supabase";
 
 type Profile = {
@@ -96,6 +97,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+    registerPushToken(session.user.id).catch(() => undefined);
+  }, [session?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

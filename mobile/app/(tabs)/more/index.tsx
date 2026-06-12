@@ -124,6 +124,18 @@ export default function MoreScreen() {
         </Pressable>
       ) : null}
 
+      {profile?.role === "super_admin" ? (
+        <Pressable onPress={() => router.push("/(tabs)/more/admin-notifications" as never)} style={styles.menuItem}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="notifications" color={colors.gold} size={24} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.menuTitle}>Panel admin</Text>
+          </View>
+          <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+        </Pressable>
+      ) : null}
+
       <Pressable onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} style={styles.menuItem}>
         <View style={styles.menuIcon}>
           <Ionicons name="shield-checkmark" color={colors.gold} size={24} />

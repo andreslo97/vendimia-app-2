@@ -30,6 +30,13 @@
         {
           "photosPermission": "La app necesita acceso a tus fotos para actualizar tu foto de perfil."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#F9820B",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {
