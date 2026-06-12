@@ -71,6 +71,9 @@ export default function LoginScreen() {
             />
           </View>
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          <Link href={"/auth/forgot-password" as never} style={styles.forgotLink}>
+            ¿Olvidaste tu contraseña?
+          </Link>
           <Pressable disabled={submitting} onPress={onSubmit} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
             {submitting ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>Ingresar</Text>}
           </Pressable>
@@ -187,6 +190,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular
   },
   link: {
+    color: colors.gold,
+    fontSize: 14,
+    fontFamily: fonts.bold
+  },
+  forgotLink: {
+    alignSelf: "flex-end",
     color: colors.gold,
     fontSize: 14,
     fontFamily: fonts.bold

@@ -1,58 +1,34 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Link, Redirect, router } from "expo-router";
+import { Link } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/hooks/use-auth";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
-import { getRegisterErrorMessage } from "@/utils/auth-errors";
 
 const vendimiaLogo = require("@/assets/vendimia-logo-orange.png");
-const registrationSuccessMessage = "Registro exitoso. Te enviamos un correo confirmando la creación de tu cuenta.";
-const fullNameValidationMessage = "Ingresa tu nombre completo con al menos dos palabras.";
+const successMessage = "Te enviamos un correo con las instrucciones para restablecer tu contraseña.";
 
-const normalizeFullName = (value: string) => value.trim().replace(/\s+/g, " ");
-
-const isValidFullName = (value: string) => normalizeFullName(value).split(" ").length >= 2;
-
-export default function RegisterScreen() {
-  const { signUp, session, loading } = useAuth();
-  const [fullName, setFullName] = useState("");
+export default function ForgotPasswordScreen() {
+  const { resetPasswordForEmail } = useAuth();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  if (!loading && session) return <Redirect href="/(tabs)" />;
 
   const onSubmit = async () => {
     try {
+      setMessage(null);
       setErrorMessage(null);
-      setSuccessMessage(null);
       setSubmitting(true);
-
-      const normalizedFullName = normalizeFullName(fullName);
-
-      if (!isValidFullName(normalizedFullName)) {
-        setErrorMessage(fullNameValidationMessage);
-        Alert.alert("Nombre completo requerido", fullNameValidationMessage);
-        return;
-      }
-
-      await signUp(normalizedFullName, email.trim(), password);
-      setSuccessMessage(registrationSuccessMessage);
-      Alert.alert("Registro exitoso", registrationSuccessMessage, [
-        {
-          text: "Aceptar",
-          onPress: () => router.replace("/auth/login")
-        }
-      ]);
-    } catch (error) {
-      const message = getRegisterErrorMessage(error);
-      setErrorMessage(message);
-      Alert.alert("Error", message);
+      await resetPasswordForEmail(email.trim());
+      setMessage(successMessage);
+      Alert.alert("Correo enviado", successMessage);
+    } catch {
+      const errorText = "No pudimos enviar el correo. Revisa el correo ingresado e intenta nuevamente.";
+      setErrorMessage(errorText);
+      Alert.alert("Error", errorText);
     } finally {
       setSubmitting(false);
     }
@@ -66,22 +42,11 @@ export default function RegisterScreen() {
             <Image source={vendimiaLogo} style={styles.logo} />
           </View>
           <Text style={styles.brand}>Iglesia Vendimia Internacional</Text>
-          <Text style={styles.title}>Mi casa es tu casa</Text>
-          <Text style={styles.subtitle}>Bienvenidos</Text>
+          <Text style={styles.title}>Restablecer contraseña</Text>
+          <Text style={styles.subtitle}>Recibirás un enlace seguro en tu correo</Text>
         </View>
 
         <View style={styles.panel}>
-          <View style={styles.inputWrap}>
-            <Ionicons name="person" color={colors.gold} size={20} />
-            <TextInput
-              autoCapitalize="words"
-              onChangeText={setFullName}
-              placeholder="Nombre completo"
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-              value={fullName}
-            />
-          </View>
           <View style={styles.inputWrap}>
             <Ionicons name="mail" color={colors.gold} size={20} />
             <TextInput
@@ -95,26 +60,17 @@ export default function RegisterScreen() {
               value={email}
             />
           </View>
-          <View style={styles.inputWrap}>
-            <Ionicons name="lock-closed" color={colors.gold} size={20} />
-            <TextInput
-              onChangeText={setPassword}
-              placeholder="Contrasena"
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
-          </View>
+
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-          {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+          {message ? <Text style={styles.successText}>{message}</Text> : null}
+
           <Pressable disabled={submitting} onPress={onSubmit} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, submitting && styles.buttonDisabled]}>
-            {submitting ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
+            {submitting ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>Enviar correo</Text>}
           </Pressable>
+
           <View style={styles.loginRow}>
-            <Text style={styles.loginText}>¿Ya tienes cuenta?</Text>
             <Link href="/auth/login" style={styles.link}>
-              Ingresar
+              Volver al inicio de sesión
             </Link>
           </View>
         </View>
@@ -211,17 +167,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.black
   },
   loginRow: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexWrap: "wrap",
-    gap: 6,
     paddingTop: 10
-  },
-  loginText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontFamily: fonts.regular
   },
   link: {
     color: colors.gold,

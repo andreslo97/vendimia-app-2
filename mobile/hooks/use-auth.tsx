@@ -1,6 +1,7 @@
 import { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
+import { Platform } from "react-native";
 
 import { supabase } from "@/services/supabase";
 
@@ -18,11 +19,23 @@ type AuthContextValue = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (fullName: string, email: string, password: string) => Promise<void>;
+  resetPasswordForEmail: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+const nativePasswordRecoveryRedirectUrl = "vendimiaapp://auth/reset-password";
+
+const getPasswordRecoveryRedirectUrl = () => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return `${window.location.origin}/auth/reset-password`;
+  }
+
+  return nativePasswordRecoveryRedirectUrl;
+};
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
@@ -83,6 +96,25 @@ export function AuthProvider({ children }: PropsWithChildren) {
             }
           }
         });
+        if (error) throw error;
+
+        supabase.functions
+          .invoke("send-registration-email", {
+            body: {
+              fullName,
+              email
+            }
+          })
+          .catch(() => undefined);
+      },
+      resetPasswordForEmail: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: getPasswordRecoveryRedirectUrl()
+        });
+        if (error) throw error;
+      },
+      updatePassword: async (password) => {
+        const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
       },
       signOut: async () => {
