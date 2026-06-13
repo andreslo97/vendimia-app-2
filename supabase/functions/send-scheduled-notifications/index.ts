@@ -12,6 +12,7 @@ const installedAppOwnershipValues = ["standalone", "bare"];
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const cronSecret = Deno.env.get("CRON_SECRET");
+const notificationImageUrl = Deno.env.get("NOTIFICATION_IMAGE_URL")?.trim();
 const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
 const getColombiaDate = () =>
@@ -77,7 +78,8 @@ const sendNotification = async (title: string, body: string, notificationType: s
         channelId: "vendimia-general",
         sound: "default",
         title,
-        body
+        body,
+        ...(notificationImageUrl ? { richContent: { image: notificationImageUrl } } : {})
       }))
     )
   });

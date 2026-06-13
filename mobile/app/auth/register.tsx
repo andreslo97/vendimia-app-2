@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Link, Redirect, router } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/hooks/use-auth";
+import { getPhoneCountryCodes, normalizePhoneNumber, PhoneCountryCode } from "@/services/phoneCountryService";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
 import { getRegisterErrorMessage } from "@/utils/auth-errors";
@@ -22,10 +23,24 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [phoneCountryCodes, setPhoneCountryCodes] = useState<PhoneCountryCode[]>([]);
+  const [phoneCountryCode, setPhoneCountryCode] = useState("");
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    getPhoneCountryCodes()
+      .then((codes) => {
+        setPhoneCountryCodes(codes);
+        setPhoneCountryCode((current) => current || codes[0]?.country_code || "");
+      })
+      .catch(() => undefined);
+  }, []);
 
   if (!loading && session) return <Redirect href="/(tabs)" />;
 
@@ -67,7 +82,13 @@ export default function RegisterScreen() {
         return;
       }
 
-      await signUp(normalizedFullName, email.trim(), password, avatarUri ?? undefined);
+      if (!phoneCountryCode || normalizePhoneNumber(phoneNumber).length < 7) {
+        setErrorMessage("Ingresa un teléfono válido.");
+        Alert.alert("Teléfono requerido", "Selecciona el país e ingresa tu número de teléfono.");
+        return;
+      }
+
+      await signUp(normalizedFullName, email.trim(), password, phoneCountryCode, phoneNumber, avatarUri ?? undefined);
       setSuccessMessage(registrationSuccessMessage);
       Alert.alert("Registro exitoso", registrationSuccessMessage, [
         {
@@ -139,15 +160,34 @@ export default function RegisterScreen() {
             />
           </View>
           <View style={styles.inputWrap}>
+            <Ionicons name="call" color={colors.gold} size={20} />
+            <Pressable onPress={() => setCountryPickerOpen(true)} style={styles.countrySelect}>
+              <Text style={styles.countrySelectText}>{phoneCountryCode || "+00"}</Text>
+              <Ionicons name="chevron-down" color={colors.text} size={16} />
+            </Pressable>
+            <TextInput
+              autoComplete="tel"
+              keyboardType="phone-pad"
+              onChangeText={setPhoneNumber}
+              placeholder="Teléfono"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+              value={phoneNumber}
+            />
+          </View>
+          <View style={styles.inputWrap}>
             <Ionicons name="lock-closed" color={colors.gold} size={20} />
             <TextInput
               onChangeText={setPassword}
-              placeholder="Contrasena"
+              placeholder="Contraseña"
               placeholderTextColor={colors.textSecondary}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               style={styles.input}
               value={password}
             />
+            <Pressable onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
+              <Ionicons name={showPassword ? "eye-off" : "eye"} color={colors.text} size={22} />
+            </Pressable>
           </View>
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
           {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
@@ -162,6 +202,29 @@ export default function RegisterScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal animationType="fade" onRequestClose={() => setCountryPickerOpen(false)} transparent visible={countryPickerOpen}>
+        <Pressable onPress={() => setCountryPickerOpen(false)} style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <Text style={styles.modalTitle}>Selecciona el país</Text>
+            <ScrollView style={styles.modalList}>
+              {phoneCountryCodes.map((country) => (
+                <Pressable
+                  key={country.id}
+                  onPress={() => {
+                    setPhoneCountryCode(country.country_code);
+                    setCountryPickerOpen(false);
+                  }}
+                  style={styles.countryOption}
+                >
+                  <Text style={styles.countryOptionText}>{country.country_name}</Text>
+                  <Text style={styles.countryOptionCode}>{country.country_code}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -258,6 +321,70 @@ const styles = StyleSheet.create({
     minHeight: 54,
     color: colors.text,
     fontSize: 16
+  },
+  eyeButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  countrySelect: {
+    minHeight: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.background,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    gap: 4
+  },
+  countrySelectText: {
+    color: colors.text,
+    fontSize: 14,
+    fontFamily: fonts.bold
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.66)",
+    justifyContent: "center",
+    padding: 22
+  },
+  modalPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.cardDark,
+    padding: 14,
+    gap: 6
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontFamily: fonts.extraBold,
+    marginBottom: 4
+  },
+  modalList: {
+    maxHeight: 360
+  },
+  countryOption: {
+    minHeight: 48,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    backgroundColor: colors.background
+  },
+  countryOptionText: {
+    color: colors.text,
+    fontSize: 14,
+    fontFamily: fonts.bold
+  },
+  countryOptionCode: {
+    color: colors.gold,
+    fontSize: 14,
+    fontFamily: fonts.black
   },
   button: {
     minHeight: 56,

@@ -1,5 +1,7 @@
 node_modules
 .expo
+.expo-start*.log
+.npm-cache
 dist
 web-build
 .env

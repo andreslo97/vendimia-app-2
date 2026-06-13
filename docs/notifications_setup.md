@@ -32,9 +32,12 @@ supabase secrets set SUPABASE_URL="https://TU_PROYECTO.supabase.co"
 supabase secrets set SUPABASE_ANON_KEY="TU_ANON_KEY"
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY="TU_SERVICE_ROLE_KEY"
 supabase secrets set CRON_SECRET="un_valor_largo_y_privado"
+supabase secrets set NOTIFICATION_IMAGE_URL="https://TU_URL_PUBLICA/vendimia-logo-orange.png"
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` nunca debe ir en la app movil.
+
+`NOTIFICATION_IMAGE_URL` es opcional. Si se configura, las notificaciones se envian con esa imagen usando `richContent.image`. Debe ser una URL publica HTTPS; puede venir de Supabase Storage o de un CDN. Para mostrar exactamente el logo naranja, sube `mobile/assets/vendimia-logo-orange.png` a un bucket publico y usa su public URL.
 
 ## 3. Desplegar funciones
 
@@ -97,6 +100,15 @@ app_ownership = standalone
 app_ownership = bare
 ```
 
+Para validar una APK Android, abre la app instalada, inicia sesion y toca `Registrar este dispositivo` desde el panel admin. El resultado esperado en `user_push_tokens` es:
+
+```text
+platform = android
+app_ownership = standalone
+```
+
+Tambien es valido `app_ownership = bare` si la build reporta entorno bare.
+
 Si el valor aparece como `unknown`, el usuario debe instalar una build nueva, abrir la app, iniciar sesion y aceptar permisos de notificacion para que el token se registre nuevamente.
 
 Consulta de diagnostico:
@@ -114,7 +126,7 @@ join public.profiles on profiles.id = user_push_tokens.user_id
 order by user_push_tokens.updated_at desc;
 ```
 
-Las Edge Functions envian notificaciones solo a tokens `standalone`, para evitar entregar mensajes a Expo Go.
+Las Edge Functions envian notificaciones solo a tokens `standalone` o `bare`, para evitar entregar mensajes a Expo Go/dev client.
 
 Si un usuario no recibe notificaciones:
 

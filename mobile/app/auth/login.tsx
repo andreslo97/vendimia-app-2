@@ -1,9 +1,10 @@
 import { Link, Redirect } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/hooks/use-auth";
+import { getPhoneCountryCodes } from "@/services/phoneCountryService";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
 import { getLoginErrorMessage } from "@/utils/auth-errors";
@@ -12,10 +13,20 @@ const vendimiaLogo = require("@/assets/vendimia-logo-orange.png");
 
 export default function LoginScreen() {
   const { signIn, session, loading } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    getPhoneCountryCodes()
+      .then((codes) => {
+        setPhoneCountryCode((current) => current || codes[0]?.country_code || "");
+      })
+      .catch(() => undefined);
+  }, []);
 
   if (!loading && session) return <Redirect href="/(tabs)" />;
 
@@ -23,7 +34,7 @@ export default function LoginScreen() {
     try {
       setErrorMessage(null);
       setSubmitting(true);
-      await signIn(email.trim(), password);
+      await signIn(identifier.trim(), password, phoneCountryCode);
     } catch (error) {
       const message = getLoginErrorMessage(error);
       setErrorMessage(message);
@@ -53,16 +64,16 @@ export default function LoginScreen() {
 
         <View style={styles.panel}>
           <View style={styles.inputWrap}>
-            <Ionicons name="mail" color={colors.gold} size={20} />
+            <Ionicons name="person" color={colors.gold} size={20} />
             <TextInput
               autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Correo"
+              autoComplete="username"
+              keyboardType="default"
+              onChangeText={setIdentifier}
+              placeholder="Correo o teléfono"
               placeholderTextColor={colors.textSecondary}
               style={styles.input}
-              value={email}
+              value={identifier}
             />
           </View>
           <View style={styles.inputWrap}>
@@ -71,10 +82,13 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               placeholder="Contraseña"
               placeholderTextColor={colors.textSecondary}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               style={styles.input}
               value={password}
             />
+            <Pressable onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
+              <Ionicons name={showPassword ? "eye-off" : "eye"} color={colors.text} size={22} />
+            </Pressable>
           </View>
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
           <Link href={"/auth/forgot-password" as never} style={styles.forgotLink}>
@@ -162,6 +176,12 @@ const styles = StyleSheet.create({
     minHeight: 54,
     color: colors.text,
     fontSize: 16
+  },
+  eyeButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center"
   },
   button: {
     minHeight: 56,

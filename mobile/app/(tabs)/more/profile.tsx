@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
+import { getPhoneCountryCodes, normalizePhoneNumber, PhoneCountryCode } from "@/services/phoneCountryService";
 import { supabase } from "@/services/supabase";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
@@ -24,26 +25,39 @@ type ProfileChangeLog = {
 const fieldLabels: Record<string, string> = {
   full_name: "Nombre",
   email: "Correo",
+  phone_country_code: "Pais",
+  phone_number: "Teléfono",
   avatar_url: "Foto",
   password: "Contraseña"
 };
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, user, updateProfileDetails, updateProfileAvatar, updatePassword } = useAuth();
+  const { profile, user, updateProfileDetails, updateProfileAvatar } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [phoneCountryCodes, setPhoneCountryCodes] = useState<PhoneCountryCode[]>([]);
+  const [phoneCountryCode, setPhoneCountryCode] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [changeLogs, setChangeLogs] = useState<ProfileChangeLog[]>([]);
 
   useEffect(() => {
     setFullName(profile?.full_name ?? "");
     setEmail(profile?.email ?? user?.email ?? "");
-  }, [profile?.email, profile?.full_name, user?.email]);
+    setPhoneCountryCode(profile?.phone_country_code ?? "");
+    setPhoneNumber(profile?.phone_number ?? "");
+  }, [profile?.email, profile?.full_name, profile?.phone_country_code, profile?.phone_number, user?.email]);
+
+  useEffect(() => {
+    getPhoneCountryCodes()
+      .then((codes) => {
+        setPhoneCountryCodes(codes);
+        setPhoneCountryCode((current) => current || profile?.phone_country_code || codes[0]?.country_code || "");
+      })
+      .catch(() => undefined);
+  }, [profile?.phone_country_code]);
 
   const loadChangeLogs = async () => {
     const { data, error } = await supabase
@@ -102,40 +116,20 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (!phoneCountryCode || normalizePhoneNumber(phoneNumber).length < 7) {
+      Alert.alert("Teléfono requerido", "Selecciona el país e ingresa un teléfono válido.");
+      return;
+    }
+
     try {
       setSavingProfile(true);
-      await updateProfileDetails(normalizedFullName, normalizedEmail);
+      await updateProfileDetails(normalizedFullName, normalizedEmail, phoneCountryCode, phoneNumber);
       await loadChangeLogs();
       Alert.alert("Perfil actualizado", "Tu información fue actualizada correctamente.");
     } catch {
       Alert.alert("Error", "No fue posible actualizar tu información.");
     } finally {
       setSavingProfile(false);
-    }
-  };
-
-  const savePassword = async () => {
-    if (newPassword.length < 6) {
-      Alert.alert("Contraseña inválida", "La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert("Contraseñas diferentes", "La confirmación no coincide con la nueva contraseña.");
-      return;
-    }
-
-    try {
-      setSavingPassword(true);
-      await updatePassword(newPassword);
-      await loadChangeLogs();
-      setNewPassword("");
-      setConfirmPassword("");
-      Alert.alert("Contraseña actualizada", "Tu contraseña fue actualizada correctamente.");
-    } catch {
-      Alert.alert("Error", "No fue posible actualizar tu contraseña.");
-    } finally {
-      setSavingPassword(false);
     }
   };
 
@@ -178,23 +172,22 @@ export default function ProfileScreen() {
             <Ionicons name="mail" color={colors.gold} size={20} />
             <TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmail} placeholder="Correo" style={styles.input} value={email} />
           </View>
+          <View style={styles.countryCodes}>
+            {phoneCountryCodes.map((country) => {
+              const active = phoneCountryCode === country.country_code;
+              return (
+                <Pressable key={country.id} onPress={() => setPhoneCountryCode(country.country_code)} style={[styles.countryPill, active && styles.countryPillActive]}>
+                  <Text style={[styles.countryPillText, active && styles.countryPillTextActive]}>{country.country_name} {country.country_code}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.inputWrap}>
+            <Ionicons name="call" color={colors.gold} size={20} />
+            <TextInput autoComplete="tel" keyboardType="phone-pad" onChangeText={setPhoneNumber} placeholder="Teléfono" style={styles.input} value={phoneNumber} />
+          </View>
           <Pressable disabled={savingProfile} onPress={saveProfile} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, savingProfile && styles.buttonDisabled]}>
             {savingProfile ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>Guardar información</Text>}
-          </Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contraseña</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons name="lock-closed" color={colors.gold} size={20} />
-            <TextInput onChangeText={setNewPassword} placeholder="Nueva contraseña" secureTextEntry style={styles.input} value={newPassword} />
-          </View>
-          <View style={styles.inputWrap}>
-            <Ionicons name="lock-closed" color={colors.gold} size={20} />
-            <TextInput onChangeText={setConfirmPassword} placeholder="Confirmar contraseña" secureTextEntry style={styles.input} value={confirmPassword} />
-          </View>
-          <Pressable disabled={savingPassword} onPress={savePassword} style={({ pressed }) => [styles.buttonSecondary, pressed && styles.buttonPressed, savingPassword && styles.buttonDisabled]}>
-            {savingPassword ? <ActivityIndicator color={colors.gold} /> : <Text style={styles.buttonSecondaryText}>Actualizar contraseña</Text>}
           </Pressable>
         </View>
 
@@ -235,6 +228,11 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.extraBold },
   inputWrap: { minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 10 },
   input: { flex: 1, minHeight: 54, color: colors.text, fontSize: 16, fontFamily: fonts.regular },
+  countryCodes: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  countryPill: { borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: colors.background },
+  countryPillActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  countryPillText: { color: colors.textSecondary, fontSize: 12, fontFamily: fonts.bold },
+  countryPillTextActive: { color: colors.background },
   button: { minHeight: 54, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: colors.gold, marginTop: 4 },
   buttonSecondary: { minHeight: 54, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.gold, marginTop: 4 },
   buttonPressed: { opacity: 0.88 },

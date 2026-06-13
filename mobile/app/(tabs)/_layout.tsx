@@ -48,6 +48,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="more/info" options={{ href: null }} />
       <Tabs.Screen name="more/profile" options={{ href: null }} />
       <Tabs.Screen name="more/admin-notifications" options={{ href: null }} />
+      <Tabs.Screen name="more/appointments" options={{ href: null }} />
+      <Tabs.Screen name="more/appointment-responses" options={{ href: null }} />
       <Tabs.Screen name="more/leadership-schedule" options={{ href: null }} />
       <Tabs.Screen name="more/locations" options={{ href: null }} />
 

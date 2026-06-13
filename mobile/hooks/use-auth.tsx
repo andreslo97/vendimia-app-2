@@ -1,9 +1,10 @@
 import { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { registerPushToken } from "@/services/pushNotificationsService";
+import { normalizePhoneNumber, resolveEmailByPhone } from "@/services/phoneCountryService";
 import { supabase } from "@/services/supabase";
 
 type Profile = {
@@ -12,6 +13,9 @@ type Profile = {
   email: string;
   role: string;
   avatar_url: string | null;
+  phone_country_code: string | null;
+  phone_number: string | null;
+  can_manage_appointments: boolean;
 };
 
 type AuthContextValue = {
@@ -19,11 +23,11 @@ type AuthContextValue = {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (fullName: string, email: string, password: string, avatarUri?: string) => Promise<void>;
+  signIn: (identifier: string, password: string, phoneCountryCode?: string) => Promise<void>;
+  signUp: (fullName: string, email: string, password: string, phoneCountryCode: string, phoneNumber: string, avatarUri?: string) => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
-  updateProfileDetails: (fullName: string, email: string) => Promise<void>;
+  updateProfileDetails: (fullName: string, email: string, phoneCountryCode: string, phoneNumber: string) => Promise<void>;
   updateProfileAvatar: (imageUri: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -73,7 +77,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id,full_name,email,role,avatar_url")
+      .select("id,full_name,email,role,avatar_url,phone_country_code,phone_number,can_manage_appointments")
       .eq("id", userId)
       .maybeSingle();
 
@@ -103,28 +107,63 @@ export function AuthProvider({ children }: PropsWithChildren) {
     registerPushToken(session.user.id).catch(() => undefined);
   }, [session?.user.id]);
 
+  useEffect(() => {
+    if (!session?.user.id) return;
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        registerPushToken(session.user.id).catch(() => undefined);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [session?.user.id]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       user: session?.user ?? null,
       profile,
       loading,
-      signIn: async (email, password) => {
+      signIn: async (identifier, password, phoneCountryCode) => {
+        const normalizedIdentifier = identifier.trim();
+        const email = normalizedIdentifier.includes("@")
+          ? normalizedIdentifier.toLowerCase()
+          : await resolveEmailByPhone(phoneCountryCode ?? "", normalizedIdentifier);
+
+        if (!email) throw new Error("No encontramos una cuenta con ese teléfono.");
+
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
-      signUp: async (fullName, email, password, avatarUri) => {
+      signUp: async (fullName, email, password, phoneCountryCode, phoneNumber, avatarUri) => {
+        const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: Linking.createURL("/auth/login"),
             data: {
-              full_name: fullName
+              full_name: fullName,
+              phone_country_code: phoneCountryCode,
+              phone_number: normalizedPhoneNumber
             }
           }
         });
         if (error) throw error;
+
+        if (data.user) {
+          const { error: phoneError } = await supabase
+            .from("profiles")
+            .update({
+              phone_country_code: phoneCountryCode,
+              phone_number: normalizedPhoneNumber
+            })
+            .eq("id", data.user.id);
+
+          if (phoneError && data.session) throw phoneError;
+        }
 
         if (avatarUri && data.user && data.session) {
           const avatarUrl = await uploadProfileAvatar(data.user.id, avatarUri);
@@ -167,11 +206,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
           });
         }
       },
-      updateProfileDetails: async (fullName, email) => {
+      updateProfileDetails: async (fullName, email, phoneCountryCode, phoneNumber) => {
         if (!session?.user.id) throw new Error("No active user session.");
 
         const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
         const normalizedEmail = email.trim().toLowerCase();
+        const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
         if (normalizedEmail !== session.user.email) {
           const { error: authError } = await supabase.auth.updateUser({ email: normalizedEmail });
@@ -182,7 +222,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
           .from("profiles")
           .update({
             full_name: normalizedFullName,
-            email: normalizedEmail
+            email: normalizedEmail,
+            phone_country_code: phoneCountryCode,
+            phone_number: normalizedPhoneNumber
           })
           .eq("id", session.user.id);
 

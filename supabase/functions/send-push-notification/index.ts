@@ -16,10 +16,30 @@ type PushToken = {
   expo_push_token: string;
 };
 
+type ExpoPushResponse = {
+  status?: string;
+  message?: string;
+  details?: {
+    error?: string;
+  };
+  id?: string;
+};
+
 const installedAppOwnershipValues = ["standalone", "bare"];
+const knownPlatforms = ["android", "ios", "web", "unknown"];
+
+const emptyDiagnostics = () => ({
+  total: 0,
+  active: 0,
+  standalone: 0,
+  installed: 0,
+  by_app_ownership: {} as Record<string, number>,
+  by_platform: {} as Record<string, { total: number; active: number; installed: number }>
+});
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const notificationImageUrl = Deno.env.get("NOTIFICATION_IMAGE_URL")?.trim();
 
 const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
@@ -96,10 +116,10 @@ const getTokenDiagnostics = async (targetRole?: string | null) => {
 
   let query = adminClient
     .from("user_push_tokens")
-    .select("app_ownership,is_active");
+    .select("app_ownership,is_active,platform");
 
   if (userIds) {
-    if (!userIds.length) return { total: 0, active: 0, standalone: 0, by_app_ownership: {} };
+    if (!userIds.length) return emptyDiagnostics();
     query = query.in("user_id", userIds);
   }
 
@@ -110,13 +130,25 @@ const getTokenDiagnostics = async (targetRole?: string | null) => {
   return rows.reduce(
     (acc, row) => {
       const ownership = row.app_ownership ?? "null";
+      const platform = knownPlatforms.includes(row.platform) ? row.platform : row.platform ?? "unknown";
+      const isInstalled = row.is_active && installedAppOwnershipValues.includes(row.app_ownership);
+
       acc.total += 1;
       if (row.is_active) acc.active += 1;
-      if (row.is_active && installedAppOwnershipValues.includes(row.app_ownership)) acc.standalone += 1;
+      if (isInstalled) {
+        acc.standalone += 1;
+        acc.installed += 1;
+      }
       acc.by_app_ownership[ownership] = (acc.by_app_ownership[ownership] ?? 0) + 1;
+
+      acc.by_platform[platform] = acc.by_platform[platform] ?? { total: 0, active: 0, installed: 0 };
+      acc.by_platform[platform].total += 1;
+      if (row.is_active) acc.by_platform[platform].active += 1;
+      if (isInstalled) acc.by_platform[platform].installed += 1;
+
       return acc;
     },
-    { total: 0, active: 0, standalone: 0, by_app_ownership: {} as Record<string, number> }
+    emptyDiagnostics()
   );
 };
 
@@ -126,7 +158,8 @@ const sendExpoPush = async (tokens: PushToken[], title: string, body: string) =>
     channelId: "vendimia-general",
     sound: "default",
     title,
-    body
+    body,
+    ...(notificationImageUrl ? { richContent: { image: notificationImageUrl } } : {})
   }));
 
   if (!messages.length) return [];
@@ -140,7 +173,7 @@ const sendExpoPush = async (tokens: PushToken[], title: string, body: string) =>
   });
 
   const json = await response.json();
-  return Array.isArray(json.data) ? json.data : [json];
+  return (Array.isArray(json.data) ? json.data : [json]) as ExpoPushResponse[];
 };
 
 Deno.serve(async (req) => {
@@ -206,14 +239,35 @@ Deno.serve(async (req) => {
     );
   }
 
+  const accepted = responses.filter((response) => response?.status === "ok").length;
+  const failed = responses.filter((response) => response?.status === "error").length;
+  const firstError = responses.find((response) => response?.status === "error");
+  const pushDiagnostics = tokens.length
+    ? {
+        tokens: tokens.length,
+        accepted,
+        failed,
+        first_error: firstError
+          ? {
+              message: firstError.message ?? null,
+              code: firstError.details?.error ?? null
+            }
+          : null
+      }
+    : null;
+
   return new Response(
     JSON.stringify({
-      ok: true,
-      sent: tokens.length,
+      ok: failed === 0,
+      sent: accepted,
+      attempted: tokens.length,
       token_filter: "app_ownership in (standalone,bare)",
       diagnostics,
+      push_diagnostics: pushDiagnostics,
       message: tokens.length
-        ? "Notification sent to installed app tokens."
+        ? accepted
+          ? "Notification accepted by Expo push service."
+          : "Notification was not accepted by Expo push service."
         : "No installed app tokens found. Users must open the latest installed build and allow notifications."
     }),
     {

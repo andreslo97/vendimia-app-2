@@ -18,12 +18,22 @@ const getProjectId = () =>
   Constants.expoConfig?.extra?.eas?.projectId ??
   Constants.easConfig?.projectId;
 
-const getAppOwnership = () => Constants.executionEnvironment ?? Constants.appOwnership ?? "unknown";
+const installedAppOwnershipValues = ["standalone", "bare"];
+
+const getRuntimeInfo = () => {
+  const appOwnership = String(Constants.executionEnvironment ?? Constants.appOwnership ?? "unknown");
+
+  return {
+    appOwnership,
+    isInstalledApp: installedAppOwnershipValues.includes(appOwnership)
+  };
+};
 
 export type PushTokenRegistrationResult = {
   status: "registered" | "skipped" | "permission_denied" | "missing_project_id" | "error";
   message: string;
   appOwnership?: string;
+  isInstalledApp?: boolean;
   platform?: string;
   token?: string;
 };
@@ -54,7 +64,8 @@ export async function registerPushToken(userId: string) {
       return {
         status: "permission_denied",
         message: "El permiso de notificaciones no fue concedido.",
-        appOwnership: getAppOwnership(),
+        appOwnership: getRuntimeInfo().appOwnership,
+        isInstalledApp: getRuntimeInfo().isInstalledApp,
         platform: Platform.OS
       } satisfies PushTokenRegistrationResult;
     }
@@ -64,20 +75,21 @@ export async function registerPushToken(userId: string) {
       return {
         status: "missing_project_id",
         message: "No se encontró el projectId de EAS para registrar el token.",
-        appOwnership: getAppOwnership(),
+        appOwnership: getRuntimeInfo().appOwnership,
+        isInstalledApp: getRuntimeInfo().isInstalledApp,
         platform: Platform.OS
       } satisfies PushTokenRegistrationResult;
     }
 
     const token = await Notifications.getExpoPushTokenAsync({ projectId });
-    const appOwnership = getAppOwnership();
+    const runtimeInfo = getRuntimeInfo();
 
     const { error } = await supabase.from("user_push_tokens").upsert(
       {
         user_id: userId,
         expo_push_token: token.data,
         platform: Platform.OS,
-        app_ownership: appOwnership,
+        app_ownership: runtimeInfo.appOwnership,
         device_name: Device.deviceName,
         project_id: projectId,
         is_active: true,
@@ -90,16 +102,22 @@ export async function registerPushToken(userId: string) {
 
     return {
       status: "registered",
-      message: `Token registrado como ${Platform.OS}/${appOwnership}.`,
-      appOwnership,
+      message: runtimeInfo.isInstalledApp
+        ? `Token instalado registrado como ${Platform.OS}/${runtimeInfo.appOwnership}.`
+        : `Token registrado como ${Platform.OS}/${runtimeInfo.appOwnership}. Abre la APK/IPA instalada para generar un token standalone o bare.`,
+      appOwnership: runtimeInfo.appOwnership,
+      isInstalledApp: runtimeInfo.isInstalledApp,
       platform: Platform.OS,
       token: token.data
     } satisfies PushTokenRegistrationResult;
   } catch (error) {
+    const runtimeInfo = getRuntimeInfo();
+
     return {
       status: "error",
       message: error instanceof Error ? error.message : "No fue posible registrar el token push.",
-      appOwnership: getAppOwnership(),
+      appOwnership: runtimeInfo.appOwnership,
+      isInstalledApp: runtimeInfo.isInstalledApp,
       platform: Platform.OS
     } satisfies PushTokenRegistrationResult;
   }

@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.vendimia.app2",
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#111111"
@@ -35,10 +36,12 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#F9820B",
           "defaultChannel": "vendimia-general"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

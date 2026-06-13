@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -59,7 +59,7 @@ export default function MoreScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]} style={styles.screen}>
       <View style={styles.profileCard}>
         <Pressable disabled={uploadingAvatar} onPress={changeProfilePhoto} style={styles.avatar}>
           {uploadingAvatar ? (
@@ -124,6 +124,28 @@ export default function MoreScreen() {
         </Pressable>
       ) : null}
 
+      <Pressable onPress={() => router.push("/(tabs)/more/appointments" as never)} style={styles.menuItem}>
+        <View style={styles.menuIcon}>
+          <Ionicons name="chatbubbles" color={colors.gold} size={24} />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.menuTitle}>Cita con el pastor</Text>
+        </View>
+        <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+      </Pressable>
+
+      {profile?.can_manage_appointments ? (
+        <Pressable onPress={() => router.push("/(tabs)/more/appointment-responses" as never)} style={styles.menuItem}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="checkmark-done-circle" color={colors.gold} size={24} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.menuTitle}>Responder citas</Text>
+          </View>
+          <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+        </Pressable>
+      ) : null}
+
       {profile?.role === "super_admin" ? (
         <Pressable onPress={() => router.push("/(tabs)/more/admin-notifications" as never)} style={styles.menuItem}>
           <View style={styles.menuIcon}>
@@ -148,14 +170,15 @@ export default function MoreScreen() {
 
       <Pressable onPress={closeSession} style={styles.signOut}>
         <Ionicons name="log-out-outline" color={colors.background} size={20} />
-        <Text style={styles.signOutText}>Cerrar sesion</Text>
+        <Text style={styles.signOutText}>Cerrar sesión</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20, gap: 18 },
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: 20, gap: 18 },
   profileCard: { borderRadius: 8, backgroundColor: colors.cardDark, borderWidth: 1, borderColor: colors.line, padding: 18, flexDirection: "row", gap: 14, alignItems: "center" },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.cardGray, alignItems: "center", justifyContent: "center" },
   avatarImage: { width: 56, height: 56, borderRadius: 28 },

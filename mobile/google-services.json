@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055127246872",
+    "project_id": "vendimiaapp-3ef25",
+    "storage_bucket": "vendimiaapp-3ef25.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055127246872:android:1de65929039aefc8118b6d",
+        "android_client_info": {
+          "package_name": "com.vendimia.app2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABMFynk2jjp6X8Z-sHexnJDieOGLR-vyM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

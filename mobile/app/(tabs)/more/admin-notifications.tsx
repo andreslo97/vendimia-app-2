@@ -5,7 +5,6 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
-import { registerPushToken } from "@/services/pushNotificationsService";
 import { supabase } from "@/services/supabase";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
@@ -27,9 +26,65 @@ const roleOptions = [
   { label: "Super admin", value: "super_admin" }
 ];
 
+type TokenDiagnostics = {
+  active?: number;
+  standalone?: number;
+  installed?: number;
+  by_app_ownership?: Record<string, number>;
+  by_platform?: Record<string, { active?: number; installed?: number; total?: number }>;
+};
+
+type PushDiagnostics = {
+  tokens?: number;
+  accepted?: number;
+  failed?: number;
+  first_error?: {
+    message?: string | null;
+    code?: string | null;
+  } | null;
+};
+
+const formatDiagnostics = (diagnostics?: TokenDiagnostics) => {
+  if (!diagnostics) return "";
+
+  const installed = diagnostics.installed ?? diagnostics.standalone ?? 0;
+  const platformText = diagnostics.by_platform
+    ? Object.entries(diagnostics.by_platform)
+        .map(([platform, counts]) => `${platform}: ${counts.active ?? 0} activos, ${counts.installed ?? 0} instalados`)
+        .join("\n")
+    : "";
+  const ownershipText = diagnostics.by_app_ownership
+    ? Object.entries(diagnostics.by_app_ownership)
+        .map(([ownership, count]) => `${ownership}: ${count}`)
+        .join(", ")
+    : "";
+
+  return [
+    `Diagnóstico: ${diagnostics.active ?? 0} activos, ${installed} instalados.`,
+    platformText,
+    ownershipText ? `Origen: ${ownershipText}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
+const formatPushDiagnostics = (diagnostics?: PushDiagnostics) => {
+  if (!diagnostics) return "";
+
+  const error = diagnostics.first_error;
+
+  return [
+    `Intentos: ${diagnostics.tokens ?? 0}. Aceptadas por Expo: ${diagnostics.accepted ?? 0}. Fallidas: ${diagnostics.failed ?? 0}.`,
+    error?.code ? `Código: ${error.code}` : "",
+    error?.message ? `Error: ${error.message}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
 export default function AdminNotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [targetRole, setTargetRole] = useState<string | null>(null);
@@ -78,35 +133,23 @@ export default function AdminNotificationsScreen() {
       setBody("");
       await loadNotifications();
       const sentCount = data?.sent ?? 0;
-      const diagnostics = data?.diagnostics;
-      const diagnosticsText = diagnostics
-        ? `\n\nDiagnóstico: ${diagnostics.active ?? 0} activos, ${diagnostics.standalone ?? 0} instalados.`
-        : "";
+      const attemptedCount = data?.attempted ?? sentCount;
+      const diagnosticsText = formatDiagnostics(data?.diagnostics);
+      const pushDiagnosticsText = formatPushDiagnostics(data?.push_diagnostics);
 
       Alert.alert(
-        sentCount ? "Notificación enviada" : "Sin dispositivos instalados",
+        sentCount ? "Notificación enviada" : attemptedCount ? "No aceptada por Expo" : "Sin dispositivos instalados",
         sentCount
           ? `Se enviaron ${sentCount} notificaciones.`
-          : `No hay tokens activos de la app instalada. Cada usuario debe abrir la última versión instalada desde Play Store/APK y aceptar las notificaciones.${diagnosticsText}`
+          : attemptedCount
+            ? `Hay tokens instalados, pero Expo no aceptó el envío.${pushDiagnosticsText ? `\n\n${pushDiagnosticsText}` : ""}`
+            : `No hay tokens activos de la app instalada. Cada usuario debe abrir la última versión instalada desde Play Store/APK y aceptar las notificaciones.${diagnosticsText ? `\n\n${diagnosticsText}` : ""}`
       );
     } catch {
       Alert.alert("Error", "No fue posible enviar la notificación.");
     } finally {
       setSending(false);
     }
-  };
-
-  const registerThisDevice = async () => {
-    if (!user?.id) {
-      Alert.alert("Sin sesión", "Inicia sesión para registrar este dispositivo.");
-      return;
-    }
-
-    const result = await registerPushToken(user.id);
-    Alert.alert(
-      result.status === "registered" ? "Dispositivo registrado" : "No se registró el dispositivo",
-      result.message
-    );
   };
 
   if (profile?.role !== "super_admin") {
@@ -138,10 +181,6 @@ export default function AdminNotificationsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Nueva notificación</Text>
-        <Pressable onPress={registerThisDevice} style={styles.secondaryButton}>
-          <Ionicons name="phone-portrait" color={colors.gold} size={18} />
-          <Text style={styles.secondaryButtonText}>Registrar este dispositivo</Text>
-        </Pressable>
         <TextInput onChangeText={setTitle} placeholder="Título" style={styles.input} value={title} />
         <TextInput multiline onChangeText={setBody} placeholder="Mensaje" style={[styles.input, styles.textArea]} textAlignVertical="top" value={body} />
 
@@ -203,17 +242,6 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.88 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: colors.background, fontSize: 15, fontFamily: fonts.black },
-  secondaryButton: {
-    minHeight: 46,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  secondaryButtonText: { color: colors.text, fontSize: 13, fontFamily: fonts.bold },
   notificationItem: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12, gap: 4 },
   notificationTitle: { color: colors.text, fontSize: 15, fontFamily: fonts.bold },
   notificationBody: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },
