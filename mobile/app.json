@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Vendimia App 2.0",
+    "name": "Iglesia Vendimia Internacional",
     "slug": "vendimia-app-2",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.vendimia.app2",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#111111"
       }
@@ -35,7 +36,7 @@
         "expo-notifications",
         {
           "color": "#F9820B",
-          "defaultChannel": "default"
+          "defaultChannel": "vendimia-general"
         }
       ]
     ],

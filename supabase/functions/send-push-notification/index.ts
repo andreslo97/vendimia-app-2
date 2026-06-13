@@ -16,6 +16,8 @@ type PushToken = {
   expo_push_token: string;
 };
 
+const installedAppOwnershipValues = ["standalone", "bare"];
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -63,7 +65,8 @@ const getTokens = async (targetRole?: string | null) => {
   let query = adminClient
     .from("user_push_tokens")
     .select("user_id,expo_push_token")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .in("app_ownership", installedAppOwnershipValues);
 
   if (userIds) {
     query = query.in("user_id", userIds);
@@ -78,9 +81,49 @@ const getTokens = async (targetRole?: string | null) => {
   })) as PushToken[];
 };
 
+const getTokenDiagnostics = async (targetRole?: string | null) => {
+  let userIds: string[] | null = null;
+
+  if (targetRole) {
+    const { data: profiles, error: profilesError } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("role", targetRole);
+
+    if (profilesError) throw profilesError;
+    userIds = (profiles ?? []).map((profile) => profile.id);
+  }
+
+  let query = adminClient
+    .from("user_push_tokens")
+    .select("app_ownership,is_active");
+
+  if (userIds) {
+    if (!userIds.length) return { total: 0, active: 0, standalone: 0, by_app_ownership: {} };
+    query = query.in("user_id", userIds);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = data ?? [];
+  return rows.reduce(
+    (acc, row) => {
+      const ownership = row.app_ownership ?? "null";
+      acc.total += 1;
+      if (row.is_active) acc.active += 1;
+      if (row.is_active && installedAppOwnershipValues.includes(row.app_ownership)) acc.standalone += 1;
+      acc.by_app_ownership[ownership] = (acc.by_app_ownership[ownership] ?? 0) + 1;
+      return acc;
+    },
+    { total: 0, active: 0, standalone: 0, by_app_ownership: {} as Record<string, number> }
+  );
+};
+
 const sendExpoPush = async (tokens: PushToken[], title: string, body: string) => {
   const messages = tokens.map((token) => ({
     to: token.expo_push_token,
+    channelId: "vendimia-general",
     sound: "default",
     title,
     body
@@ -133,6 +176,7 @@ Deno.serve(async (req) => {
   }
 
   const tokens = await getTokens(targetRole);
+  const diagnostics = tokens.length ? null : await getTokenDiagnostics(targetRole);
   const { data: notification, error: notificationError } = await adminClient
     .from("notifications")
     .insert({
@@ -162,7 +206,18 @@ Deno.serve(async (req) => {
     );
   }
 
-  return new Response(JSON.stringify({ ok: true, sent: tokens.length }), {
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      sent: tokens.length,
+      token_filter: "app_ownership in (standalone,bare)",
+      diagnostics,
+      message: tokens.length
+        ? "Notification sent to installed app tokens."
+        : "No installed app tokens found. Users must open the latest installed build and allow notifications."
+    }),
+    {
     headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
+    }
+  );
 });

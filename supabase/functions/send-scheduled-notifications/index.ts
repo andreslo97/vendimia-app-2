@@ -7,6 +7,8 @@ type PushToken = {
   expo_push_token: string;
 };
 
+const installedAppOwnershipValues = ["standalone", "bare"];
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const cronSecret = Deno.env.get("CRON_SECRET");
@@ -34,7 +36,8 @@ const getTokens = async (targetRole?: string | null) => {
   let query = adminClient
     .from("user_push_tokens")
     .select("user_id,expo_push_token")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .in("app_ownership", installedAppOwnershipValues);
 
   if (userIds) query = query.in("user_id", userIds);
 
@@ -71,6 +74,7 @@ const sendNotification = async (title: string, body: string, notificationType: s
     body: JSON.stringify(
       tokens.map((token) => ({
         to: token.expo_push_token,
+        channelId: "vendimia-general",
         sound: "default",
         title,
         body

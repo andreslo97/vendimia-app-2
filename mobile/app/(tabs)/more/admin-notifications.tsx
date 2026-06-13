@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
+import { registerPushToken } from "@/services/pushNotificationsService";
 import { supabase } from "@/services/supabase";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
@@ -28,7 +29,7 @@ const roleOptions = [
 
 export default function AdminNotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [targetRole, setTargetRole] = useState<string | null>(null);
@@ -76,12 +77,36 @@ export default function AdminNotificationsScreen() {
       setTitle("");
       setBody("");
       await loadNotifications();
-      Alert.alert("Notificación enviada", `Se enviaron ${data?.sent ?? 0} notificaciones.`);
+      const sentCount = data?.sent ?? 0;
+      const diagnostics = data?.diagnostics;
+      const diagnosticsText = diagnostics
+        ? `\n\nDiagnóstico: ${diagnostics.active ?? 0} activos, ${diagnostics.standalone ?? 0} instalados.`
+        : "";
+
+      Alert.alert(
+        sentCount ? "Notificación enviada" : "Sin dispositivos instalados",
+        sentCount
+          ? `Se enviaron ${sentCount} notificaciones.`
+          : `No hay tokens activos de la app instalada. Cada usuario debe abrir la última versión instalada desde Play Store/APK y aceptar las notificaciones.${diagnosticsText}`
+      );
     } catch {
       Alert.alert("Error", "No fue posible enviar la notificación.");
     } finally {
       setSending(false);
     }
+  };
+
+  const registerThisDevice = async () => {
+    if (!user?.id) {
+      Alert.alert("Sin sesión", "Inicia sesión para registrar este dispositivo.");
+      return;
+    }
+
+    const result = await registerPushToken(user.id);
+    Alert.alert(
+      result.status === "registered" ? "Dispositivo registrado" : "No se registró el dispositivo",
+      result.message
+    );
   };
 
   if (profile?.role !== "super_admin") {
@@ -93,11 +118,15 @@ export default function AdminNotificationsScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
-      style={styles.screen}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.screen}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 140 }]}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+        style={styles.screen}
+      >
       <Pressable onPress={() => router.replace("/(tabs)/more" as never)} style={styles.backButton}>
         <Ionicons name="arrow-back" color={colors.text} size={22} />
       </Pressable>
@@ -109,6 +138,10 @@ export default function AdminNotificationsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Nueva notificación</Text>
+        <Pressable onPress={registerThisDevice} style={styles.secondaryButton}>
+          <Ionicons name="phone-portrait" color={colors.gold} size={18} />
+          <Text style={styles.secondaryButtonText}>Registrar este dispositivo</Text>
+        </Pressable>
         <TextInput onChangeText={setTitle} placeholder="Título" style={styles.input} value={title} />
         <TextInput multiline onChangeText={setBody} placeholder="Mensaje" style={[styles.input, styles.textArea]} textAlignVertical="top" value={body} />
 
@@ -144,7 +177,8 @@ export default function AdminNotificationsScreen() {
           <Text style={styles.emptyText}>Aún no hay notificaciones registradas.</Text>
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -169,6 +203,17 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.88 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: colors.background, fontSize: 15, fontFamily: fonts.black },
+  secondaryButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  secondaryButtonText: { color: colors.text, fontSize: 13, fontFamily: fonts.bold },
   notificationItem: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12, gap: 4 },
   notificationTitle: { color: colors.text, fontSize: 15, fontFamily: fonts.bold },
   notificationBody: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },
