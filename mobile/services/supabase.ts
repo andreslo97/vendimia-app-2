@@ -26,6 +26,24 @@ const webStorage = {
   }
 };
 
+export const clearSupabasePersistedSession = async () => {
+  if (Platform.OS === "web") {
+    if (typeof window === "undefined") return;
+
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"))
+      .forEach((key) => window.localStorage.removeItem(key));
+    return;
+  }
+
+  const keys = await AsyncStorage.getAllKeys();
+  const supabaseAuthKeys = keys.filter((key) => key.startsWith("sb-") && key.endsWith("-auth-token"));
+
+  if (supabaseAuthKeys.length) {
+    await AsyncStorage.multiRemove(supabaseAuthKeys);
+  }
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: Platform.OS === "web" ? webStorage : AsyncStorage,

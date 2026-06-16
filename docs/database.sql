@@ -791,7 +791,10 @@ using (
     select 1
     from public.profiles
     where profiles.id = auth.uid()
-    and profiles.role = discipleship_materials.allowed_role
+    and (
+      profiles.role = discipleship_materials.allowed_role
+      or profiles.role = 'super_admin'
+    )
   )
 );
 
@@ -805,7 +808,7 @@ using (
     select 1
     from public.profiles
     where profiles.id = auth.uid()
-    and profiles.role = 'lider'
+    and profiles.role in ('lider', 'super_admin')
   )
 );
 

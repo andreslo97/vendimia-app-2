@@ -9,15 +9,20 @@ import { useAuth } from "@/hooks/use-auth";
 import { DiscipleshipMaterial, getDiscipleshipMaterialById, getMaterialSignedUrl } from "@/services/discipleshipService";
 import { colors } from "@/theme/colors";
 
+const canViewMaterial = (role: string | null | undefined, allowedRole: string) =>
+  role === "super_admin" || role === allowedRole;
+
 export default function MaterialViewerScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile } = useAuth();
+  const { loading: authLoading, profile } = useAuth();
   const [material, setMaterial] = useState<DiscipleshipMaterial | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+
     const load = async () => {
       const materialId = Number(id);
       if (!materialId) return;
@@ -27,8 +32,8 @@ export default function MaterialViewerScreen() {
 
       if (!nextMaterial) return;
 
-      if (profile?.role !== nextMaterial.allowed_role) {
-        Alert.alert("Acceso restringido", "Este material solo esta disponible para lideres.", [
+      if (!canViewMaterial(profile?.role, nextMaterial.allowed_role)) {
+        Alert.alert("Acceso restringido", "Necesitas ser líder para ver este contenido.", [
           {
             text: "Aceptar",
             onPress: () => router.replace("/discipulado/material")
@@ -40,12 +45,13 @@ export default function MaterialViewerScreen() {
       setSignedUrl(await getMaterialSignedUrl(nextMaterial));
     };
 
+    setLoading(true);
     load()
       .catch((error) => {
         Alert.alert("Error", error instanceof Error ? error.message : "No fue posible cargar el material.");
       })
       .finally(() => setLoading(false));
-  }, [id, profile?.role]);
+  }, [authLoading, id, profile?.role]);
 
   const openExternal = async () => {
     if (signedUrl) await Linking.openURL(signedUrl);

@@ -5,7 +5,7 @@ import { AppState, Platform } from "react-native";
 
 import { registerPushToken } from "@/services/pushNotificationsService";
 import { normalizePhoneNumber, resolveEmailByPhone } from "@/services/phoneCountryService";
-import { supabase } from "@/services/supabase";
+import { clearSupabasePersistedSession, supabase } from "@/services/supabase";
 
 type Profile = {
   id: string;
@@ -36,6 +36,11 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const nativePasswordRecoveryRedirectUrl = "vendimiaapp://auth/reset-password";
+
+const isInvalidRefreshTokenError = (error: unknown) =>
+  error instanceof Error &&
+  (error.message.toLowerCase().includes("invalid refresh token") ||
+    error.message.toLowerCase().includes("refresh token not found"));
 
 const getPasswordRecoveryRedirectUrl = () => {
   if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -85,13 +90,38 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(data);
   };
 
+  const clearInvalidSession = async () => {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+    await clearSupabasePersistedSession().catch(() => undefined);
+    setSession(null);
+    setProfile(null);
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error) throw error;
-      setSession(data.session);
-      await loadProfile(data.session?.user.id);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data, error }) => {
+        if (error) {
+          if (isInvalidRefreshTokenError(error)) {
+            await clearInvalidSession();
+            return;
+          }
+
+          throw error;
+        }
+
+        setSession(data.session);
+        await loadProfile(data.session?.user.id);
+      })
+      .catch(async (error) => {
+        if (isInvalidRefreshTokenError(error)) {
+          await clearInvalidSession();
+        } else {
+          setSession(null);
+          setProfile(null);
+        }
+      })
+      .finally(() => setLoading(false));
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
