@@ -93,7 +93,7 @@ with ranked_events as (
   select id, row_number() over (order by event_date asc, id asc) as rn
   from public.events
   where is_active = true
-  and event_date >= current_date
+  and event_date >= (now() at time zone 'America/Bogota')::date
 )
 update public.events
 set

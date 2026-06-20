@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/services/supabase";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
+import { runRefresh } from "@/utils/refresh";
 
 type NotificationRow = {
   id: number;
@@ -17,6 +18,15 @@ type NotificationRow = {
   notification_type: string;
   sent_at: string | null;
   created_at: string;
+};
+
+type NotificationMasterRow = {
+  id: number;
+  notification_key: string;
+  category: string;
+  name: string;
+  implementation_status: "ready" | "planned";
+  is_active: boolean;
 };
 
 const roleOptions = [
@@ -91,6 +101,8 @@ export default function AdminNotificationsScreen() {
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [masterNotifications, setMasterNotifications] = useState<NotificationMasterRow[]>([]);
+  const [updatingMasterId, setUpdatingMasterId] = useState<number | null>(null);
 
   const loadNotifications = async () => {
     const { data } = await supabase
@@ -102,13 +114,24 @@ export default function AdminNotificationsScreen() {
     setNotifications(data ?? []);
   };
 
+  const loadMasterNotifications = async () => {
+    const { data, error } = await supabase
+      .from("notification_master")
+      .select("id,notification_key,category,name,implementation_status,is_active")
+      .order("category", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    setMasterNotifications((data ?? []) as NotificationMasterRow[]);
+  };
+
   useEffect(() => {
-    loadNotifications();
+    Promise.all([loadNotifications(), loadMasterNotifications()]).catch(() => undefined);
   }, []);
 
   const refresh = async () => {
     setRefreshing(true);
-    await loadNotifications().finally(() => setRefreshing(false));
+    await runRefresh(() => Promise.all([loadNotifications(), loadMasterNotifications()])).finally(() => setRefreshing(false));
   };
 
   const sendNotification = async () => {
@@ -152,6 +175,26 @@ export default function AdminNotificationsScreen() {
     }
   };
 
+  const toggleMasterNotification = async (notification: NotificationMasterRow) => {
+    try {
+      setUpdatingMasterId(notification.id);
+      const { error } = await supabase
+        .from("notification_master")
+        .update({
+          is_active: !notification.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", notification.id);
+
+      if (error) throw error;
+      await loadMasterNotifications();
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "No fue posible actualizar la automatización.");
+    } finally {
+      setUpdatingMasterId(null);
+    }
+  };
+
   if (profile?.role !== "super_admin") {
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top + 16 }]}>
@@ -167,16 +210,16 @@ export default function AdminNotificationsScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 140 }]}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
         style={styles.screen}
       >
-      <Pressable onPress={() => router.replace("/(tabs)/more" as never)} style={styles.backButton}>
+      <Pressable onPress={() => router.replace("/(tabs)/more/admin" as never)} style={styles.backButton}>
         <Ionicons name="arrow-back" color={colors.text} size={22} />
       </Pressable>
 
       <View style={styles.header}>
-        <Text style={styles.title}>Panel admin</Text>
-        <Text style={styles.subtitle}>Envía notificaciones manuales a toda la iglesia o a un rol específico.</Text>
+        <Text style={styles.title}>Notificaciones</Text>
+        <Text style={styles.subtitle}>Envía mensajes y controla las automatizaciones de la iglesia.</Text>
       </View>
 
       <View style={styles.section}>
@@ -198,6 +241,32 @@ export default function AdminNotificationsScreen() {
         <Pressable disabled={sending} onPress={sendNotification} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, sending && styles.buttonDisabled]}>
           {sending ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>Enviar notificación</Text>}
         </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notificaciones automáticas</Text>
+        <Text style={styles.sectionDescription}>Activa o desactiva las reglas configuradas en la tabla MASTER.</Text>
+        {masterNotifications.map((notification) => (
+          <View key={notification.id} style={styles.masterItem}>
+            <View style={styles.masterContent}>
+              <Text style={styles.masterName}>{notification.name}</Text>
+              <Text style={styles.masterMeta}>
+                {notification.category} · {notification.implementation_status === "ready" ? "Disponible" : "Planificada"}
+              </Text>
+            </View>
+            <Pressable
+              disabled={updatingMasterId === notification.id || notification.implementation_status !== "ready"}
+              onPress={() => toggleMasterNotification(notification)}
+              style={[
+                styles.toggle,
+                notification.is_active && styles.toggleActive,
+                notification.implementation_status !== "ready" && styles.toggleDisabled
+              ]}
+            >
+              <View style={[styles.toggleThumb, notification.is_active && styles.toggleThumbActive]} />
+            </Pressable>
+          </View>
+        ))}
       </View>
 
       <View style={styles.section}>
@@ -231,6 +300,7 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, fontFamily: fonts.regular },
   section: { borderRadius: 8, backgroundColor: colors.cardDark, borderWidth: 1, borderColor: colors.line, padding: 16, gap: 12 },
   sectionTitle: { color: colors.text, fontSize: 18, fontFamily: fonts.extraBold },
+  sectionDescription: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },
   input: { minHeight: 52, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background, color: colors.text, paddingHorizontal: 14, fontFamily: fonts.regular },
   textArea: { minHeight: 110, paddingTop: 14 },
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -242,6 +312,15 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.88 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: colors.background, fontSize: 15, fontFamily: fonts.black },
+  masterItem: { minHeight: 58, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12, flexDirection: "row", alignItems: "center", gap: 12 },
+  masterContent: { flex: 1, gap: 3 },
+  masterName: { color: colors.text, fontSize: 14, fontFamily: fonts.bold },
+  masterMeta: { color: colors.textSecondary, fontSize: 11, fontFamily: fonts.regular },
+  toggle: { width: 48, height: 28, borderRadius: 14, padding: 3, backgroundColor: colors.cardGray, justifyContent: "center" },
+  toggleActive: { backgroundColor: colors.gold },
+  toggleDisabled: { opacity: 0.4 },
+  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.textSecondary },
+  toggleThumbActive: { alignSelf: "flex-end", backgroundColor: colors.background },
   notificationItem: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12, gap: 4 },
   notificationTitle: { color: colors.text, fontSize: 15, fontFamily: fonts.bold },
   notificationBody: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },

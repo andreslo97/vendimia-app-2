@@ -7,6 +7,16 @@ type PushToken = {
   expo_push_token: string;
 };
 
+type MasterRow = {
+  id: number;
+  notification_key: string;
+  title_template: string;
+  body_template: string;
+  route: string | null;
+  is_active: boolean;
+  implementation_status: string;
+};
+
 const installedAppOwnershipValues = ["standalone", "bare"];
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -14,11 +24,6 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const cronSecret = Deno.env.get("CRON_SECRET");
 const notificationImageUrl = Deno.env.get("NOTIFICATION_IMAGE_URL")?.trim();
 const adminClient = createClient(supabaseUrl, serviceRoleKey);
-
-const getColombiaDate = () =>
-  new Date().toLocaleDateString("en-CA", {
-    timeZone: "America/Bogota"
-  });
 
 const getTokens = async (targetRole?: string | null) => {
   let userIds: string[] | null = null;
@@ -48,16 +53,41 @@ const getTokens = async (targetRole?: string | null) => {
   return (data ?? []) as PushToken[];
 };
 
-const sendNotification = async (title: string, body: string, notificationType: string, targetRole?: string | null) => {
+const interpolate = (template: string, variables: Record<string, string | number>) =>
+  template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) =>
+    variables[key] === undefined ? `{${key}}` : String(variables[key])
+  );
+
+const getMaster = async (notificationKey: string) => {
+  const { data, error } = await adminClient
+    .from("notification_master")
+    .select("id,notification_key,title_template,body_template,route,is_active,implementation_status")
+    .eq("notification_key", notificationKey)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as MasterRow | null;
+};
+
+const sendNotification = async (
+  master: MasterRow,
+  variables: Record<string, string | number> = {},
+  targetRole?: string | null
+) => {
   const tokens = await getTokens(targetRole);
+  const title = interpolate(master.title_template, variables);
+  const body = interpolate(master.body_template, variables);
 
   const { data: notification, error: notificationError } = await adminClient
     .from("notifications")
     .insert({
+      master_id: master.id,
       title,
       body,
       target_role: targetRole ?? null,
-      notification_type: notificationType,
+      notification_type: master.notification_key,
+      route: master.route,
+      data: { variables },
       sent_at: new Date().toISOString()
     })
     .select("id")
@@ -79,6 +109,7 @@ const sendNotification = async (title: string, body: string, notificationType: s
         sound: "default",
         title,
         body,
+        data: master.route ? { route: master.route } : {},
         ...(notificationImageUrl ? { richContent: { image: notificationImageUrl } } : {})
       }))
     )
@@ -100,41 +131,28 @@ const sendNotification = async (title: string, body: string, notificationType: s
   return { sent: tokens.length };
 };
 
+const sendMasterNotification = async (
+  notificationKey: string,
+  variables: Record<string, string | number> = {},
+  targetRole?: string | null
+) => {
+  const master = await getMaster(notificationKey);
+  if (!master) return { sent: 0, skipped: "master_not_found" };
+  if (!master.is_active) return { sent: 0, skipped: "inactive" };
+  if (master.implementation_status !== "ready") return { sent: 0, skipped: "not_ready" };
+
+  return sendNotification(master, variables, targetRole);
+};
+
 const sendTodayEvents = async () => {
-  const today = getColombiaDate();
-  const { data: events, error } = await adminClient
-    .from("events")
-    .select("title,event_time,location")
-    .eq("is_active", true)
-    .eq("event_date", today)
-    .order("event_time", { ascending: true });
-
-  if (error) throw error;
-  if (!events?.length) return { sent: 0, skipped: "no_events" };
-
-  const firstEvent = events[0];
-  const title = events.length === 1 ? "Hoy tenemos evento" : `Hoy tenemos ${events.length} eventos`;
-  const body =
-    events.length === 1
-      ? `${firstEvent.title}${firstEvent.event_time ? ` a las ${firstEvent.event_time}` : ""}${firstEvent.location ? ` en ${firstEvent.location}` : ""}.`
-      : "Revisa el apartado Eventos para ver la programación de hoy.";
-
-  return sendNotification(title, body, "today_events");
+  return { sent: 0, skipped: "legacy_schedule_disabled" };
 };
 
 const sendDailyDevotional = () =>
-  sendNotification(
-    "¿Ya hiciste tu devocional diario?",
-    "Recuerda que puedes escribir tus notas devocionales en la app.",
-    "daily_devotional"
-  );
+  sendMasterNotification("daily_devotional_reminder");
 
 const sendWeeklyBible = () =>
-  sendNotification(
-    "La Biblia está disponible en la app",
-    "Puedes leer distintas versiones desde Discipulado > Biblia.",
-    "weekly_bible"
-  );
+  sendMasterNotification("discipleship_weekly_reading");
 
 Deno.serve(async (req) => {
   if (cronSecret && req.headers.get("x-cron-secret") !== cronSecret) {

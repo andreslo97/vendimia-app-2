@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getHomeData, HomeData } from "@/services/homeService";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
+import { runRefresh } from "@/utils/refresh";
+import { HomeSongPreview } from "@/components/HomeSongPreview";
 
 const vendimiaLogo = require("@/assets/vendimia-logo-orange.png");
 
@@ -24,7 +26,7 @@ export default function HomeScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await load().finally(() => setRefreshing(false));
+    await runRefresh(load).finally(() => setRefreshing(false));
   };
 
   if (loading) {
@@ -37,6 +39,7 @@ export default function HomeScreen() {
 
   const banner = data?.banners[0];
   const quickSection = data?.sections.find((item) => item.section_key === "quick_links");
+  const dailyDevotionalSection = data?.sections.find((item) => item.section_key === "daily_devotional");
   const eventsSection = data?.sections.find((item) => item.section_key === "upcoming_events") ?? data?.sections.find((item) => item.section_key === "next_event");
   const openMaps = async (url?: string | null) => {
     if (!url) return;
@@ -45,8 +48,18 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
+      alwaysBounceVertical
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+      refreshControl={
+        <RefreshControl
+          colors={[colors.gold]}
+          onRefresh={refresh}
+          progressBackgroundColor={colors.cardDark}
+          progressViewOffset={insets.top + 8}
+          refreshing={refreshing}
+          tintColor={colors.gold}
+        />
+      }
       style={styles.screen}
     >
       {data?.header ? (
@@ -86,6 +99,8 @@ export default function HomeScreen() {
         </ImageBackground>
       ) : null}
 
+      {data?.songPreview ? <HomeSongPreview song={data.songPreview} /> : null}
+
       {quickSection && data?.quickLinks.length ? (
         <View style={styles.section}>
           {quickSection.title ? <Text style={styles.sectionTitle}>{quickSection.title}</Text> : null}
@@ -97,6 +112,25 @@ export default function HomeScreen() {
               </Pressable>
             ))}
           </View>
+        </View>
+      ) : null}
+
+      {data?.dailyDevotional ? (
+        <View style={styles.section}>
+          {dailyDevotionalSection?.title ? <Text style={styles.sectionTitle}>{dailyDevotionalSection.title}</Text> : null}
+          <Pressable
+            onPress={() => router.push("/(tabs)/discipulado/devocionales" as never)}
+            style={({ pressed }) => [styles.devotionalCard, pressed && styles.cardPressed]}
+          >
+            <View style={styles.devotionalIcon}>
+              <Ionicons name="sunny" color={colors.background} size={24} />
+            </View>
+            <View style={styles.devotionalContent}>
+              <Text numberOfLines={1} style={styles.devotionalTitle}>{data.dailyDevotional.title}</Text>
+              <Text numberOfLines={2} style={styles.devotionalVerse}>{data.dailyDevotional.verse}</Text>
+            </View>
+            <Ionicons name="chevron-forward" color={colors.gold} size={22} />
+          </Pressable>
         </View>
       ) : null}
 
@@ -166,6 +200,12 @@ const styles = StyleSheet.create({
   quickGrid: { flexDirection: "row", gap: 10 },
   quickCard: { flex: 1, minHeight: 78, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6 },
   quickText: { color: colors.text, fontSize: 11, fontFamily: fonts.medium, maxWidth: "100%" },
+  devotionalCard: { minHeight: 88, borderRadius: 16, backgroundColor: colors.cardDark, borderWidth: 1, borderColor: colors.gold, padding: 14, flexDirection: "row", alignItems: "center", gap: 13 },
+  cardPressed: { opacity: 0.86 },
+  devotionalIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center" },
+  devotionalContent: { flex: 1, gap: 4 },
+  devotionalTitle: { color: colors.text, fontSize: 16, fontFamily: fonts.extraBold },
+  devotionalVerse: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, fontFamily: fonts.medium },
   eventGrid: { flexDirection: "row", gap: 12 },
   eventPressable: { flex: 1 },
   eventCard: { flex: 1, minHeight: 178, borderRadius: 16, padding: 12, overflow: "hidden", borderWidth: 1, borderColor: colors.line, justifyContent: "space-between" },
