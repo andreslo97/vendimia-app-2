@@ -7,13 +7,26 @@ Este modulo usa:
 - Supabase Edge Functions para enviar notificaciones.
 - Rol administrador poderoso: `public.profiles.role = 'super_admin'`.
 
+## 0. Zona horaria
+
+Ejecuta una vez:
+
+```sql
+-- docs/colombia_timezone.sql
+```
+
+Los campos `timestamptz` se conservan internamente como instantes UTC, que es el comportamiento correcto de PostgreSQL, y se presentan en `America/Bogota`. Los campos de tipo `date` usan explicitamente la fecha de Colombia.
+
 ## 1. Ejecutar SQL
 
 Ejecuta en Supabase/Navicat:
 
 ```sql
 -- docs/notifications.sql
+-- docs/notification_master.sql
 ```
+
+`notification_master.sql` crea el catalogo MASTER, la cola `notification_jobs` y carga las 29 reglas iniciales. Las reglas con `implementation_status = 'planned'` quedan desactivadas hasta implementar su disparador.
 
 Para convertir un usuario en super administrador:
 
@@ -44,6 +57,7 @@ supabase secrets set NOTIFICATION_IMAGE_URL="https://TU_URL_PUBLICA/vendimia-log
 ```bash
 supabase functions deploy send-push-notification
 supabase functions deploy send-scheduled-notifications
+supabase functions deploy dispatch-master-notification
 ```
 
 ## 4. Cron sugerido
@@ -83,7 +97,22 @@ El panel aparece en `Mas > Panel admin` solo si el usuario autenticado tiene:
 profiles.role = super_admin
 ```
 
-Desde ese panel se puede enviar una notificacion a todos o a un rol especifico.
+Desde ese panel se puede:
+
+- Enviar una notificacion manual a todos o a un rol.
+- Publicar o editar el devocional diario.
+- Activar o desactivar reglas de `notification_master`.
+
+Automatizaciones conectadas inicialmente:
+
+- Devocional diario publicado.
+- Confirmacion de solicitud de cita para el solicitante.
+- Nueva cita para usuarios con `can_manage_appointments = true`.
+- Cita aceptada.
+- Cita rechazada.
+- Actualizacion de respuesta de cita.
+
+Las demas reglas quedan sembradas en MASTER con estado planificado.
 
 ## 6. Nueva build requerida
 

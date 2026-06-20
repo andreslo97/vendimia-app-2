@@ -1,15 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
-import { createDevotionalNote, DevotionalData, getDevotionalData } from "@/services/devotionalService";
+import {
+  createDevotionalNote,
+  deactivateDevotionalNote,
+  DevotionalData,
+  DevotionalNote,
+  getDevotionalData,
+  updateDevotionalNote
+} from "@/services/devotionalService";
 import { colors } from "@/theme/colors";
+import { runRefresh } from "@/utils/refresh";
 
 export default function DevotionalsScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   const { user } = useAuth();
   const [data, setData] = useState<DevotionalData | null>(null);
   const [passageReference, setPassageReference] = useState("");
@@ -18,6 +27,8 @@ export default function DevotionalsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<number | null>(null);
 
   const load = async () => {
     if (!user?.id) return;
@@ -30,7 +41,7 @@ export default function DevotionalsScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await load().finally(() => setRefreshing(false));
+    await runRefresh(load).finally(() => setRefreshing(false));
   };
 
   const saveNote = async () => {
@@ -38,16 +49,59 @@ export default function DevotionalsScreen() {
 
     try {
       setSubmitting(true);
-      await createDevotionalNote(user.id, passageReference, title, body);
+      if (editingId) {
+        await updateDevotionalNote(user.id, editingId, passageReference, title, body);
+      } else {
+        await createDevotionalNote(user.id, passageReference, title, body);
+      }
       setPassageReference("");
       setTitle("");
       setBody("");
+      setEditingId(null);
       await load();
     } catch (error) {
       Alert.alert("Error", error instanceof Error ? error.message : "No fue posible guardar la nota.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const editNote = (note: DevotionalNote) => {
+    setEditingId(note.id);
+    setPassageReference(note.passage_reference);
+    setTitle(note.title ?? "");
+    setBody(note.body);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setPassageReference("");
+    setTitle("");
+    setBody("");
+  };
+
+  const confirmDeactivate = (note: DevotionalNote) => {
+    Alert.alert("Eliminar nota devocional", "La nota dejará de aparecer en la app, pero se conservará en la base de datos.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          if (!user?.id) return;
+          try {
+            setDeactivatingId(note.id);
+            await deactivateDevotionalNote(user.id, note.id);
+            if (editingId === note.id) cancelEditing();
+            await load();
+          } catch (error) {
+            Alert.alert("Error", error instanceof Error ? error.message : "No fue posible eliminar la nota devocional.");
+          } finally {
+            setDeactivatingId(null);
+          }
+        }
+      }
+    ]);
   };
 
   if (loading) {
@@ -61,11 +115,12 @@ export default function DevotionalsScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 140 }]}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
         style={styles.screen}
       >
       <Pressable onPress={() => router.replace("/(tabs)/discipulado")} style={styles.backButton}>
@@ -76,6 +131,17 @@ export default function DevotionalsScreen() {
         <View style={styles.header}>
           {data.content.title ? <Text style={styles.title}>{data.content.title}</Text> : null}
           {data.content.subtitle ? <Text style={styles.subtitle}>{data.content.subtitle}</Text> : null}
+        </View>
+      ) : null}
+
+      {data?.dailyDevotional ? (
+        <View style={styles.dailyCard}>
+          <View style={styles.dailyIcon}>
+            <Ionicons name="sunny" color={colors.background} size={22} />
+          </View>
+          <Text style={styles.dailyTitle}>{data.dailyDevotional.title}</Text>
+          <Text style={styles.dailyVerse}>{data.dailyDevotional.verse}</Text>
+          <Text style={styles.dailyBody}>{data.dailyDevotional.body}</Text>
         </View>
       ) : null}
 
@@ -109,7 +175,12 @@ export default function DevotionalsScreen() {
             onPress={saveNote}
             style={[styles.submitButton, (!passageReference.trim() || !body.trim() || submitting) && styles.disabledButton]}
           >
-            {submitting ? <ActivityIndicator color={colors.background} /> : <Text style={styles.submitText}>{data.content.save_button_text}</Text>}
+            {submitting ? <ActivityIndicator color={colors.background} /> : <Text style={styles.submitText}>{editingId ? "Guardar cambios" : data.content.save_button_text}</Text>}
+          </Pressable>
+        ) : null}
+        {editingId ? (
+          <Pressable onPress={cancelEditing} style={styles.cancelButton}>
+            <Text style={styles.cancelText}>Cancelar edición</Text>
           </Pressable>
         ) : null}
       </View>
@@ -123,6 +194,16 @@ export default function DevotionalsScreen() {
             </View>
             {note.title ? <Text style={styles.noteTitle}>{note.title}</Text> : null}
             <Text style={styles.noteBody}>{note.body}</Text>
+            <View style={styles.noteActions}>
+              <Pressable accessibilityLabel="Editar nota devocional" onPress={() => editNote(note)} style={styles.editButton}>
+                <Ionicons name="pencil" color={colors.gold} size={17} />
+                <Text style={styles.editText}>Editar</Text>
+              </Pressable>
+              <Pressable accessibilityLabel="Eliminar nota devocional" disabled={deactivatingId === note.id} onPress={() => confirmDeactivate(note)} style={styles.deleteButton}>
+                {deactivatingId === note.id ? <ActivityIndicator color={colors.danger} size="small" /> : <Ionicons name="trash-outline" color={colors.danger} size={17} />}
+                <Text style={styles.deleteText}>Eliminar</Text>
+              </Pressable>
+            </View>
           </View>
         ))
       ) : data?.content?.empty_text ? (
@@ -143,18 +224,30 @@ const styles = StyleSheet.create({
   header: { gap: 6 },
   title: { color: colors.text, fontSize: 31, fontWeight: "900" },
   subtitle: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
+  dailyCard: { borderRadius: 8, backgroundColor: colors.cardDark, borderWidth: 1, borderColor: colors.gold, padding: 18, gap: 10 },
+  dailyIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center" },
+  dailyTitle: { color: colors.text, fontSize: 22, lineHeight: 28, fontWeight: "900" },
+  dailyVerse: { color: colors.gold, fontSize: 15, lineHeight: 22, fontWeight: "800" },
+  dailyBody: { color: colors.textSecondary, fontSize: 15, lineHeight: 23 },
   formCard: { borderRadius: 8, backgroundColor: colors.cardDark, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 12 },
   input: { minHeight: 48, color: colors.text, fontSize: 15, borderBottomWidth: 1, borderBottomColor: colors.line },
   textArea: { minHeight: 120, color: colors.text, fontSize: 15, lineHeight: 22 },
   submitButton: { minHeight: 48, borderRadius: 8, backgroundColor: colors.gold, alignItems: "center", justifyContent: "center" },
   disabledButton: { opacity: 0.55 },
   submitText: { color: colors.background, fontSize: 15, fontWeight: "800" },
+  cancelButton: { minHeight: 44, borderRadius: 8, borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center" },
+  cancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: "700" },
   noteCard: { borderRadius: 8, backgroundColor: colors.cardDark, borderWidth: 1, borderColor: colors.line, padding: 18, gap: 8 },
   noteHeader: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   reference: { color: colors.gold, fontSize: 13, fontWeight: "800", flex: 1 },
   date: { color: colors.textSecondary, fontSize: 12 },
   noteTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
   noteBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 21 },
+  noteActions: { flexDirection: "row", gap: 10, marginTop: 8 },
+  editButton: { flex: 1, minHeight: 42, borderRadius: 8, borderWidth: 1, borderColor: colors.line, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  editText: { color: colors.text, fontSize: 13, fontWeight: "700" },
+  deleteButton: { flex: 1, minHeight: 42, borderRadius: 8, borderWidth: 1, borderColor: colors.danger, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  deleteText: { color: colors.danger, fontSize: 13, fontWeight: "700" },
   emptyCard: { borderRadius: 8, borderWidth: 1, borderColor: colors.line, padding: 18, backgroundColor: colors.cardDark },
   emptyText: { color: colors.textSecondary, fontSize: 14, lineHeight: 21 }
 });

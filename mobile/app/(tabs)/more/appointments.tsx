@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/hooks/use-auth";
 import { appointmentStatusLabels, createPastorAppointment, getMyAppointments, PastorAppointment } from "@/services/pastorAppointmentsService";
 import { colors } from "@/theme/colors";
+import { runRefresh } from "@/utils/refresh";
 import { fonts } from "@/theme/fonts";
 
 const isValidDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -61,7 +62,7 @@ export default function AppointmentsScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await loadAppointments().finally(() => setRefreshing(false));
+    await runRefresh(loadAppointments).finally(() => setRefreshing(false));
   };
 
   const submitAppointment = async () => {
@@ -118,7 +119,7 @@ export default function AppointmentsScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 140 }]}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
       >
         <Pressable onPress={() => router.replace("/(tabs)/more" as never)} style={styles.backButton}>
           <Ionicons name="arrow-back" color={colors.text} size={22} />

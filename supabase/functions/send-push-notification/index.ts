@@ -152,13 +152,14 @@ const getTokenDiagnostics = async (targetRole?: string | null) => {
   );
 };
 
-const sendExpoPush = async (tokens: PushToken[], title: string, body: string) => {
+const sendExpoPush = async (tokens: PushToken[], title: string, body: string, route?: string | null) => {
   const messages = tokens.map((token) => ({
     to: token.expo_push_token,
     channelId: "vendimia-general",
     sound: "default",
     title,
     body,
+    data: route ? { route } : {},
     ...(notificationImageUrl ? { richContent: { image: notificationImageUrl } } : {})
   }));
 
@@ -208,15 +209,37 @@ Deno.serve(async (req) => {
     });
   }
 
+  const { data: master, error: masterError } = await adminClient
+    .from("notification_master")
+    .select("id,is_active,implementation_status,route")
+    .eq("notification_key", "general_announcement")
+    .maybeSingle();
+
+  if (masterError) throw masterError;
+  if (!master) {
+    return new Response(JSON.stringify({ error: "Notification MASTER is not configured" }), {
+      status: 409,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
+  if (!master.is_active || master.implementation_status !== "ready") {
+    return new Response(JSON.stringify({ error: "General announcements are disabled in notification MASTER" }), {
+      status: 409,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
+
   const tokens = await getTokens(targetRole);
   const diagnostics = tokens.length ? null : await getTokenDiagnostics(targetRole);
   const { data: notification, error: notificationError } = await adminClient
     .from("notifications")
     .insert({
+      master_id: master.id,
       title,
       body,
       target_role: targetRole,
       notification_type: "manual",
+      route: master.route,
       sent_at: new Date().toISOString(),
       created_by: admin.userId
     })
@@ -225,7 +248,7 @@ Deno.serve(async (req) => {
 
   if (notificationError) throw notificationError;
 
-  const responses = await sendExpoPush(tokens, title, body);
+  const responses = await sendExpoPush(tokens, title, body, master.route);
 
   if (notification?.id && tokens.length) {
     await adminClient.from("notification_deliveries").insert(

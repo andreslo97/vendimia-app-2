@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/hooks/use-auth";
 import { DiscipleshipMaterial, getDiscipleshipMaterials } from "@/services/discipleshipService";
 import { colors } from "@/theme/colors";
+import { runRefresh } from "@/utils/refresh";
 
 const canViewLeadershipMaterial = (role?: string | null) => role === "lider" || role === "super_admin";
 
@@ -25,7 +26,7 @@ export default function MaterialScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await load().finally(() => setRefreshing(false));
+    await runRefresh(load).finally(() => setRefreshing(false));
   };
 
   if (loading || authLoading) {
@@ -39,7 +40,7 @@ export default function MaterialScreen() {
   return (
     <ScrollView
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+      refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
       style={styles.screen}
     >
       <Pressable onPress={() => router.replace("/(tabs)/discipulado")} style={styles.backButton}>

@@ -10,6 +10,7 @@ import { getPhoneCountryCodes, normalizePhoneNumber, PhoneCountryCode } from "@/
 import { supabase } from "@/services/supabase";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
+import { formatColombiaDateTime } from "@/utils/colombiaDateTime";
 
 const normalizeFullName = (value: string) => value.trim().replace(/\s+/g, " ");
 const isValidFullName = (value: string) => normalizeFullName(value).split(" ").length >= 2;
@@ -201,7 +202,7 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.logBody}>
                   <Text style={styles.logTitle}>{fieldLabels[log.field_name] ?? log.field_name}</Text>
-                  <Text style={styles.logDate}>{new Date(log.created_at).toLocaleString()}</Text>
+                  <Text style={styles.logDate}>{formatColombiaDateTime(log.created_at)}</Text>
                 </View>
               </View>
             ))

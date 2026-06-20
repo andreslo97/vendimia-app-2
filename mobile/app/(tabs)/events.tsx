@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventItem } from "@/services/homeService";
 import { supabase } from "@/services/supabase";
 import { colors } from "@/theme/colors";
+import { runRefresh } from "@/utils/refresh";
 
 export default function EventsScreen() {
   const insets = useSafeAreaInsets();
@@ -28,7 +29,7 @@ export default function EventsScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await load().finally(() => setRefreshing(false));
+    await runRefresh(load).finally(() => setRefreshing(false));
   };
 
   const openMaps = async (url?: string | null) => {
@@ -47,7 +48,7 @@ export default function EventsScreen() {
   return (
     <ScrollView
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+      refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
       style={styles.screen}
     >
       {items.map((item, index) => (

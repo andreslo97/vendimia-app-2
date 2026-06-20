@@ -48,9 +48,20 @@ export default function TabsLayout() {
       <Tabs.Screen name="more/info" options={{ href: null }} />
       <Tabs.Screen name="more/profile" options={{ href: null }} />
       <Tabs.Screen name="more/admin-notifications" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/index" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/home" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/home-song" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/devotional" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/events" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/users" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/leadership-schedule" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/weekly-songs" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/church" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/system" options={{ href: null }} />
       <Tabs.Screen name="more/appointments" options={{ href: null }} />
       <Tabs.Screen name="more/appointment-responses" options={{ href: null }} />
       <Tabs.Screen name="more/leadership-schedule" options={{ href: null }} />
+      <Tabs.Screen name="more/weekly-songs" options={{ href: null }} />
       <Tabs.Screen name="more/locations" options={{ href: null }} />
 
       <Tabs.Screen name="discipulado/devocionales" options={{ href: null }} />

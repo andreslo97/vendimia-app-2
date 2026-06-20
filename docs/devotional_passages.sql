@@ -28,9 +28,17 @@ create table if not exists public.devotional_notes (
   user_id uuid not null references auth.users(id) on delete cascade,
   passage_id bigint not null references public.devotional_passages(id) on delete cascade,
   body text not null,
-  note_date date not null default current_date,
-  created_at timestamptz default now()
+  note_date date not null default ((now() at time zone 'America/Bogota')::date),
+  is_active boolean not null default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz not null default now()
 );
+
+alter table public.devotional_notes
+add column if not exists is_active boolean not null default true;
+
+alter table public.devotional_notes
+add column if not exists updated_at timestamptz not null default now();
 
 alter table public.devotional_screen_content enable row level security;
 alter table public.devotional_passages enable row level security;
@@ -68,10 +76,6 @@ using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
 drop policy if exists "devotional_notes_delete_own" on public.devotional_notes;
-create policy "devotional_notes_delete_own"
-on public.devotional_notes for delete
-to authenticated
-using (auth.uid() = user_id);
 
 update public.discipleship_modules
 set route = '/discipulado/devocionales'

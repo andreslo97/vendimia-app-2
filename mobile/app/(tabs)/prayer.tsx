@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/hooks/use-auth";
 import { createPrayerRequest, getPrayerData, PrayerData, PrayerRequestItem, togglePrayerLike } from "@/services/prayerService";
 import { colors } from "@/theme/colors";
+import { formatColombiaDate } from "@/utils/colombiaDateTime";
+import { runRefresh } from "@/utils/refresh";
 
 export default function PrayerScreen() {
   const insets = useSafeAreaInsets();
@@ -28,7 +30,7 @@ export default function PrayerScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await load().finally(() => setRefreshing(false));
+    await runRefresh(load).finally(() => setRefreshing(false));
   };
 
   const submit = async () => {
@@ -76,7 +78,7 @@ export default function PrayerScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 140 }]}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
         style={styles.screen}
       >
       {data?.content ? (
@@ -108,7 +110,7 @@ export default function PrayerScreen() {
           <View key={request.id} style={styles.requestCard}>
             <Text style={styles.body}>{request.body}</Text>
             <View style={styles.footer}>
-              <Text style={styles.date}>{new Date(request.created_at).toLocaleDateString()}</Text>
+              <Text style={styles.date}>{formatColombiaDate(request.created_at)}</Text>
               <Pressable disabled={activeLikeId === request.id} onPress={() => pressLike(request)} style={styles.likeButton}>
                 <Ionicons name={request.likedByMe ? "heart" : "heart-outline"} color={request.likedByMe ? colors.gold : colors.textSecondary} size={20} />
                 <Text style={[styles.likeText, request.likedByMe && styles.likeTextActive]}>

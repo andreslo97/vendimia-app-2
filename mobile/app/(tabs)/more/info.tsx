@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChurchInfo, getChurchInfo } from "@/services/churchInfoService";
 import { colors } from "@/theme/colors";
+import { runRefresh } from "@/utils/refresh";
 import { fonts } from "@/theme/fonts";
 
 const vendimiaLogo = require("@/assets/vendimia-logo-orange.png");
@@ -24,7 +25,7 @@ export default function ChurchInfoScreen() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await load().finally(() => setRefreshing(false));
+    await runRefresh(load).finally(() => setRefreshing(false));
   };
 
   if (loading) {
@@ -38,7 +39,7 @@ export default function ChurchInfoScreen() {
   return (
     <ScrollView
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 96 }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
+      refreshControl={<RefreshControl colors={[colors.gold]} progressBackgroundColor={colors.cardDark} refreshing={refreshing} onRefresh={refresh} tintColor={colors.gold} />}
       style={styles.screen}
     >
       <Pressable onPress={() => router.replace("/(tabs)/more")} style={styles.backButton}>

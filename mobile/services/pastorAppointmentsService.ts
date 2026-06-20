@@ -42,15 +42,28 @@ export const getMyAppointments = async () => {
 };
 
 export const createPastorAppointment = async (userId: string, appointmentDate: string, appointmentTime: string, reason: string) => {
-  const { error } = await supabase.from("pastor_appointments").insert({
-    user_id: userId,
-    appointment_date: appointmentDate,
-    appointment_time: appointmentTime,
-    reason: reason.trim(),
-    status: "enviado"
-  });
+  const { data, error } = await supabase
+    .from("pastor_appointments")
+    .insert({
+      user_id: userId,
+      appointment_date: appointmentDate,
+      appointment_time: appointmentTime,
+      reason: reason.trim(),
+      status: "enviado"
+    })
+    .select("id")
+    .single();
 
   if (error) throw error;
+
+  await supabase.functions
+    .invoke("dispatch-master-notification", {
+      body: {
+        event: "appointment_created",
+        appointmentId: data.id
+      }
+    })
+    .catch(() => undefined);
 };
 
 export const getAppointmentsForResponse = async () => {
@@ -91,4 +104,13 @@ export const respondPastorAppointment = async (appointmentId: number, status: Ap
     .eq("id", appointmentId);
 
   if (error) throw error;
+
+  await supabase.functions
+    .invoke("dispatch-master-notification", {
+      body: {
+        event: "appointment_updated",
+        appointmentId
+      }
+    })
+    .catch(() => undefined);
 };

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/hooks/use-auth";
 import { ChurchLocationsHeader, getChurchLocationsHeader } from "@/services/churchLocationsService";
 import { getLeadershipScheduleHeader, LeadershipScheduleHeader } from "@/services/leadershipScheduleService";
+import { getWeeklySongsHeader, WeeklySongsHeader } from "@/services/weeklySongsService";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/theme/fonts";
 
@@ -18,11 +19,13 @@ export default function MoreScreen() {
   const { profile, user, signOut, updateProfileAvatar } = useAuth();
   const [scheduleHeader, setScheduleHeader] = useState<LeadershipScheduleHeader | null>(null);
   const [locationsHeader, setLocationsHeader] = useState<ChurchLocationsHeader | null>(null);
+  const [songsHeader, setSongsHeader] = useState<WeeklySongsHeader | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     getLeadershipScheduleHeader().then(setScheduleHeader).catch(() => setScheduleHeader(null));
     getChurchLocationsHeader().then(setLocationsHeader).catch(() => setLocationsHeader(null));
+    getWeeklySongsHeader().then(setSongsHeader).catch(() => setSongsHeader(null));
   }, []);
 
   const closeSession = async () => {
@@ -112,6 +115,18 @@ export default function MoreScreen() {
         </Pressable>
       ) : null}
 
+      {songsHeader?.menu_title ? (
+        <Pressable onPress={() => router.push("/(tabs)/more/weekly-songs" as never)} style={styles.menuItem}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="musical-notes" color={colors.gold} size={24} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.menuTitle}>{songsHeader.menu_title}</Text>
+          </View>
+          <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+        </Pressable>
+      ) : null}
+
       {locationsHeader?.menu_title ? (
         <Pressable onPress={() => router.push("/(tabs)/more/locations" as never)} style={styles.menuItem}>
           <View style={styles.menuIcon}>
@@ -147,9 +162,9 @@ export default function MoreScreen() {
       ) : null}
 
       {profile?.role === "super_admin" ? (
-        <Pressable onPress={() => router.push("/(tabs)/more/admin-notifications" as never)} style={styles.menuItem}>
+        <Pressable onPress={() => router.push("/(tabs)/more/admin" as never)} style={styles.menuItem}>
           <View style={styles.menuIcon}>
-            <Ionicons name="notifications" color={colors.gold} size={24} />
+            <Ionicons name="settings" color={colors.gold} size={24} />
           </View>
           <View style={styles.flex}>
             <Text style={styles.menuTitle}>Panel admin</Text>
