@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { colors } from "@/theme/colors";
 
 export default function IndexScreen() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -15,5 +15,10 @@ export default function IndexScreen() {
     );
   }
 
-  return <Redirect href={session ? "/(tabs)" : "/auth/login"} />;
+  if (!session) return <Redirect href="/auth/login" />;
+  if (profile && (!profile.church_attendance_time?.trim() || profile.is_being_discipled === null)) {
+    return <Redirect href="/auth/onboarding" />;
+  }
+
+  return <Redirect href="/(tabs)" />;
 }

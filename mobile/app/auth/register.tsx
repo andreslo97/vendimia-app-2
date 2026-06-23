@@ -19,7 +19,7 @@ const normalizeFullName = (value: string) => value.trim().replace(/\s+/g, " ");
 const isValidFullName = (value: string) => normalizeFullName(value).split(" ").length >= 2;
 
 export default function RegisterScreen() {
-  const { signUp, session, loading } = useAuth();
+  const { signUp, session, profile, loading } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +42,13 @@ export default function RegisterScreen() {
       .catch(() => undefined);
   }, []);
 
-  if (!loading && session) return <Redirect href="/(tabs)" />;
+  if (!loading && session) {
+    if (profile && (!profile.church_attendance_time?.trim() || profile.is_being_discipled === null)) {
+      return <Redirect href="/auth/onboarding" />;
+    }
+
+    return <Redirect href="/(tabs)" />;
+  }
 
   const selectProfilePhoto = async () => {
     try {

@@ -20,9 +20,15 @@ export function HomeSongPreview({ song }: Props) {
   const player = useAudioPlayer(song.audio_preview_url, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const stoppingRef = useRef(false);
-  const previewDuration = Math.min(60, Math.max(1, song.preview_duration_seconds));
-  const effectiveDuration = status.duration > 0 ? Math.min(previewDuration, status.duration) : previewDuration;
-  const progress = Math.min(1, status.currentTime / effectiveDuration);
+  const configuredDuration =
+    song.preview_duration_seconds && song.preview_duration_seconds > 0
+      ? song.preview_duration_seconds
+      : null;
+  const effectiveDuration =
+    configuredDuration && status.duration > 0
+      ? Math.min(configuredDuration, status.duration)
+      : configuredDuration ?? status.duration;
+  const progress = effectiveDuration > 0 ? Math.min(1, status.currentTime / effectiveDuration) : 0;
 
   useEffect(() => {
     player.volume = 1;
@@ -34,14 +40,14 @@ export function HomeSongPreview({ song }: Props) {
   }, [player]);
 
   useEffect(() => {
-    if (status.currentTime < effectiveDuration || stoppingRef.current) return;
+    if (!configuredDuration || status.currentTime < effectiveDuration || stoppingRef.current) return;
 
     stoppingRef.current = true;
     player.pause();
     player.seekTo(0).finally(() => {
       stoppingRef.current = false;
     });
-  }, [effectiveDuration, player, status.currentTime]);
+  }, [configuredDuration, effectiveDuration, player, status.currentTime]);
 
   const togglePlayback = async () => {
     if (!status.isLoaded) {
@@ -54,7 +60,7 @@ export function HomeSongPreview({ song }: Props) {
       return;
     }
 
-    if (status.currentTime >= effectiveDuration - 0.2 || status.didJustFinish) {
+    if ((effectiveDuration > 0 && status.currentTime >= effectiveDuration - 0.2) || status.didJustFinish) {
       await player.seekTo(0);
     }
 
@@ -92,7 +98,9 @@ export function HomeSongPreview({ song }: Props) {
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
           </View>
-          <Text style={styles.time}>{formatTime(Math.min(status.currentTime, effectiveDuration))}/{formatTime(effectiveDuration)}</Text>
+          <Text style={styles.time}>
+            {formatTime(effectiveDuration > 0 ? Math.min(status.currentTime, effectiveDuration) : status.currentTime)}/{effectiveDuration > 0 ? formatTime(effectiveDuration) : "--:--"}
+          </Text>
         </View>
       </View>
     </View>

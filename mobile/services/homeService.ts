@@ -83,7 +83,7 @@ export type HomeSongPreview = {
   artist: string | null;
   audio_preview_url: string;
   cover_url: string | null;
-  preview_duration_seconds: number;
+  preview_duration_seconds: number | null;
 };
 
 export type HomeData = {

@@ -38,6 +38,12 @@ Para activar la cancion publica reproducible de Inicio, ejecuta:
 docs/home_featured_song.sql
 ```
 
+Para activar el modulo de contactos de grupos, ejecuta:
+
+```text
+docs/church_group_contacts.sql
+```
+
 El script crea:
 
 - Validacion centralizada del rol `super_admin`.
@@ -53,9 +59,10 @@ El script crea:
 - Usuarios y roles: rol y permiso para gestionar citas.
 - Citas pastorales: acceso al modulo existente de respuestas.
 - Cronograma liderazgo: encabezado, responsables, orden y estado.
-- Cancion de Inicio: fragmento publico con portada, URL de audio y duración
-  configurable de 1 a 60 segundos.
+- Cancion de Inicio: audio publico con portada y duración completa o un corte
+  configurable en segundos.
 - Canciones semanales: repertorio interno, artistas, tonalidades y referencias.
+- Contactos de grupos: responsables, correos, telefonos opcionales y estado.
 - Sedes e informacion: datos institucionales y sedes existentes.
 - Notificaciones: envios manuales, automatizaciones e historial.
 - Estado del sistema: usuarios, tokens, trabajos y pendientes.

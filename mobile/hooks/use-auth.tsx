@@ -15,6 +15,8 @@ type Profile = {
   avatar_url: string | null;
   phone_country_code: string | null;
   phone_number: string | null;
+  church_attendance_time: string | null;
+  is_being_discipled: boolean | null;
   can_manage_appointments: boolean;
 };
 
@@ -28,6 +30,7 @@ type AuthContextValue = {
   resetPasswordForEmail: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   updateProfileDetails: (fullName: string, email: string, phoneCountryCode: string, phoneNumber: string) => Promise<void>;
+  updateOnboardingDetails: (churchAttendanceTime: string, isBeingDiscipled: boolean) => Promise<void>;
   updateProfileAvatar: (imageUri: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -82,7 +85,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id,full_name,email,role,avatar_url,phone_country_code,phone_number,can_manage_appointments")
+      .select("id,full_name,email,role,avatar_url,phone_country_code,phone_number,church_attendance_time,is_being_discipled,can_manage_appointments")
       .eq("id", userId)
       .maybeSingle();
 
@@ -259,6 +262,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
           .eq("id", session.user.id);
 
         if (profileError) throw profileError;
+        await loadProfile(session.user.id);
+      },
+      updateOnboardingDetails: async (churchAttendanceTime, isBeingDiscipled) => {
+        if (!session?.user.id) throw new Error("No active user session.");
+
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            church_attendance_time: churchAttendanceTime.trim().replace(/\s+/g, " "),
+            is_being_discipled: isBeingDiscipled
+          })
+          .eq("id", session.user.id);
+
+        if (error) throw error;
         await loadProfile(session.user.id);
       },
       updateProfileAvatar: async (imageUri) => {

@@ -31,7 +31,7 @@ const emptySong = (): Omit<AdminHomeFeaturedSong, "id"> => ({
   audio_preview_url: "",
   cover_url: "",
   reference_url: "",
-  preview_duration_seconds: 60,
+  preview_duration_seconds: null,
   is_active: true
 });
 
@@ -136,11 +136,17 @@ export default function AdminHomeSongScreen() {
           />
           <TextInput
             keyboardType="number-pad"
-            onChangeText={(value) => setSong({ ...song, preview_duration_seconds: Math.min(60, Number.parseInt(value, 10) || 1) })}
-            placeholder="Duración entre 1 y 60 segundos"
+            onChangeText={(value) => {
+              const parsedValue = Number.parseInt(value, 10);
+              setSong({
+                ...song,
+                preview_duration_seconds: Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null
+              });
+            }}
+            placeholder="Duración en segundos (vacío = canción completa)"
             placeholderTextColor={colors.textSecondary}
             style={styles.input}
-            value={String(song.preview_duration_seconds)}
+            value={song.preview_duration_seconds ? String(song.preview_duration_seconds) : ""}
           />
           <View style={styles.setting}>
             <View style={styles.settingCopy}>
@@ -161,7 +167,7 @@ export default function AdminHomeSongScreen() {
 
         <View style={styles.note}>
           <Ionicons name="information-circle" color={colors.gold} size={20} />
-          <Text style={styles.noteText}>Utiliza audio propio o autorizado. El reproductor detendrá el fragmento automáticamente al alcanzar la duración configurada.</Text>
+          <Text style={styles.noteText}>Utiliza audio propio o autorizado. Deja la duración vacía para reproducir la canción completa o indica el segundo exacto en el que debe detenerse.</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -5,13 +5,24 @@ create table if not exists public.home_featured_song (
   audio_preview_url text not null,
   cover_url text,
   reference_url text,
-  preview_duration_seconds int not null default 60
+  preview_duration_seconds int
     constraint home_featured_song_duration_check
-    check (preview_duration_seconds between 1 and 60),
+    check (preview_duration_seconds is null or preview_duration_seconds > 0),
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.home_featured_song
+  drop constraint if exists home_featured_song_duration_check;
+
+alter table public.home_featured_song
+  alter column preview_duration_seconds drop not null,
+  alter column preview_duration_seconds drop default;
+
+alter table public.home_featured_song
+  add constraint home_featured_song_duration_check
+  check (preview_duration_seconds is null or preview_duration_seconds > 0);
 
 alter table public.home_featured_song enable row level security;
 
