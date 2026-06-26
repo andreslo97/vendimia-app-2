@@ -93,7 +93,26 @@ export type AdminHomeFeaturedSong = {
   audio_preview_url: string;
   cover_url: string | null;
   reference_url: string | null;
-  preview_duration_seconds: number;
+  preview_duration_seconds: number | null;
+  is_active: boolean;
+};
+
+export type AdminChurchGroupContactsHeader = {
+  id: number;
+  menu_title: string | null;
+  screen_title: string | null;
+  subtitle: string | null;
+  is_active: boolean;
+};
+
+export type AdminChurchGroupContact = {
+  id: number;
+  group_name: string;
+  contact_name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  sort_order: number;
   is_active: boolean;
 };
 
@@ -433,7 +452,10 @@ export const saveAdminHomeFeaturedSong = async (
     audio_preview_url: song.audio_preview_url.trim(),
     cover_url: song.cover_url?.trim() || null,
     reference_url: song.reference_url?.trim() || null,
-    preview_duration_seconds: Math.min(60, Math.max(1, song.preview_duration_seconds)),
+    preview_duration_seconds:
+      song.preview_duration_seconds && song.preview_duration_seconds > 0
+        ? Math.floor(song.preview_duration_seconds)
+        : null,
     is_active: song.is_active,
     updated_at: new Date().toISOString()
   };
@@ -451,4 +473,97 @@ export const saveAdminHomeFeaturedSong = async (
   const { data, error } = await supabase.from("home_featured_song").insert(payload).select("id").single();
   if (error) throw error;
   await logAdminAction(adminUserId, "home_featured_song", "create", "home_featured_song", data.id, payload);
+};
+
+export const getAdminChurchGroupContacts = async () => {
+  const [headerResult, contactsResult] = await Promise.all([
+    supabase
+      .from("church_group_contacts_header")
+      .select("id,menu_title,screen_title,subtitle,is_active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("church_group_contacts")
+      .select("id,group_name,contact_name,email,phone,notes,sort_order,is_active")
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true })
+  ]);
+
+  if (headerResult.error) throw headerResult.error;
+  if (contactsResult.error) throw contactsResult.error;
+
+  return {
+    header: headerResult.data as AdminChurchGroupContactsHeader | null,
+    contacts: (contactsResult.data ?? []) as AdminChurchGroupContact[]
+  };
+};
+
+export const saveAdminChurchGroupContactsHeader = async (
+  adminUserId: string,
+  header: Omit<AdminChurchGroupContactsHeader, "id"> & { id?: number }
+) => {
+  const payload = {
+    menu_title: header.menu_title?.trim() || null,
+    screen_title: header.screen_title?.trim() || null,
+    subtitle: header.subtitle?.trim() || null,
+    is_active: header.is_active
+  };
+
+  if (header.id) {
+    const { error } = await supabase.from("church_group_contacts_header").update(payload).eq("id", header.id);
+    if (error) throw error;
+    await logAdminAction(adminUserId, "church_group_contacts", "update_header", "church_group_contacts_header", header.id, payload);
+    return;
+  }
+
+  const { data, error } = await supabase.from("church_group_contacts_header").insert(payload).select("id").single();
+  if (error) throw error;
+  await logAdminAction(adminUserId, "church_group_contacts", "create_header", "church_group_contacts_header", data.id, payload);
+};
+
+export const saveAdminChurchGroupContact = async (
+  adminUserId: string,
+  contact: Omit<AdminChurchGroupContact, "id"> & { id?: number }
+) => {
+  const payload = {
+    group_name: contact.group_name.trim(),
+    contact_name: contact.contact_name.trim(),
+    email: contact.email?.trim() || null,
+    phone: contact.phone?.trim() || null,
+    notes: contact.notes?.trim() || null,
+    sort_order: contact.sort_order,
+    is_active: contact.is_active,
+    updated_at: new Date().toISOString()
+  };
+
+  if (contact.id) {
+    const { error } = await supabase.from("church_group_contacts").update(payload).eq("id", contact.id);
+    if (error) throw error;
+    await logAdminAction(adminUserId, "church_group_contacts", "update_contact", "church_group_contacts", contact.id, payload);
+    return;
+  }
+
+  const { data, error } = await supabase.from("church_group_contacts").insert(payload).select("id").single();
+  if (error) throw error;
+  await logAdminAction(adminUserId, "church_group_contacts", "create_contact", "church_group_contacts", data.id, payload);
+};
+
+export const setAdminChurchGroupContactActive = async (
+  adminUserId: string,
+  contact: AdminChurchGroupContact,
+  isActive: boolean
+) => {
+  const payload = { is_active: isActive, updated_at: new Date().toISOString() };
+  const { error } = await supabase.from("church_group_contacts").update(payload).eq("id", contact.id);
+  if (error) throw error;
+
+  await logAdminAction(
+    adminUserId,
+    "church_group_contacts",
+    isActive ? "restore_contact" : "deactivate_contact",
+    "church_group_contacts",
+    contact.id,
+    payload
+  );
 };

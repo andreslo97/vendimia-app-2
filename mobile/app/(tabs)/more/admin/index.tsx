@@ -19,7 +19,7 @@ const groups: { title: string; options: AdminOption[] }[] = [
     title: "Contenido",
     options: [
       { title: "Inicio", subtitle: "Encabezado, banner y palabra del día", icon: "home", route: "/(tabs)/more/admin/home" },
-      { title: "Canción de Inicio", subtitle: "Fragmento público reproducible de hasta 60 segundos", icon: "play-circle", route: "/(tabs)/more/admin/home-song" },
+      { title: "Canción de Inicio", subtitle: "Reproducción completa o con duración personalizada", icon: "play-circle", route: "/(tabs)/more/admin/home-song" },
       { title: "Devocional diario", subtitle: "Publicar y editar el contenido de hoy", icon: "sunny", route: "/(tabs)/more/admin/devotional" },
       { title: "Eventos", subtitle: "Crear, editar, destacar o desactivar", icon: "calendar", route: "/(tabs)/more/admin/events" }
     ]
@@ -31,6 +31,7 @@ const groups: { title: string; options: AdminOption[] }[] = [
       { title: "Citas pastorales", subtitle: "Solicitudes y respuestas pendientes", icon: "chatbubbles", route: "/(tabs)/more/appointment-responses" },
       { title: "Cronograma liderazgo", subtitle: "Programación, responsables y orden del servicio", icon: "list", route: "/(tabs)/more/admin/leadership-schedule" },
       { title: "Canciones semanales", subtitle: "Repertorio, tonalidades y referencias", icon: "musical-notes", route: "/(tabs)/more/admin/weekly-songs" },
+      { title: "Contactos de grupos", subtitle: "Responsables, correos y datos de contacto", icon: "people-circle", route: "/(tabs)/more/admin/group-contacts" },
       { title: "Sedes e información", subtitle: "Editar contenido institucional y ubicaciones", icon: "location", route: "/(tabs)/more/admin/church" }
     ]
   },

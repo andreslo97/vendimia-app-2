@@ -13,7 +13,7 @@ const tabIcon = (name: TabIconName) =>
   };
 
 export default function TabsLayout() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -24,6 +24,9 @@ export default function TabsLayout() {
   }
 
   if (!session) return <Redirect href="/auth/login" />;
+  if (profile && (!profile.church_attendance_time?.trim() || profile.is_being_discipled === null)) {
+    return <Redirect href="/auth/onboarding" />;
+  }
 
   return (
     <Tabs
@@ -56,12 +59,15 @@ export default function TabsLayout() {
       <Tabs.Screen name="more/admin/users" options={{ href: null }} />
       <Tabs.Screen name="more/admin/leadership-schedule" options={{ href: null }} />
       <Tabs.Screen name="more/admin/weekly-songs" options={{ href: null }} />
+      <Tabs.Screen name="more/admin/group-contacts" options={{ href: null }} />
       <Tabs.Screen name="more/admin/church" options={{ href: null }} />
       <Tabs.Screen name="more/admin/system" options={{ href: null }} />
       <Tabs.Screen name="more/appointments" options={{ href: null }} />
       <Tabs.Screen name="more/appointment-responses" options={{ href: null }} />
       <Tabs.Screen name="more/leadership-schedule" options={{ href: null }} />
       <Tabs.Screen name="more/weekly-songs" options={{ href: null }} />
+      <Tabs.Screen name="more/group-contacts" options={{ href: null }} />
+      <Tabs.Screen name="more/giving" options={{ href: null }} />
       <Tabs.Screen name="more/locations" options={{ href: null }} />
 
       <Tabs.Screen name="discipulado/devocionales" options={{ href: null }} />

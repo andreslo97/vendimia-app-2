@@ -6,7 +6,9 @@ import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleS
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
+import { ChurchGroupContactsHeader, getChurchGroupContactsHeader } from "@/services/churchGroupContactsService";
 import { ChurchLocationsHeader, getChurchLocationsHeader } from "@/services/churchLocationsService";
+import { getGivingAccount, GivingAccount } from "@/services/givingAccountService";
 import { getLeadershipScheduleHeader, LeadershipScheduleHeader } from "@/services/leadershipScheduleService";
 import { getWeeklySongsHeader, WeeklySongsHeader } from "@/services/weeklySongsService";
 import { colors } from "@/theme/colors";
@@ -20,12 +22,16 @@ export default function MoreScreen() {
   const [scheduleHeader, setScheduleHeader] = useState<LeadershipScheduleHeader | null>(null);
   const [locationsHeader, setLocationsHeader] = useState<ChurchLocationsHeader | null>(null);
   const [songsHeader, setSongsHeader] = useState<WeeklySongsHeader | null>(null);
+  const [groupContactsHeader, setGroupContactsHeader] = useState<ChurchGroupContactsHeader | null>(null);
+  const [givingAccount, setGivingAccount] = useState<GivingAccount | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     getLeadershipScheduleHeader().then(setScheduleHeader).catch(() => setScheduleHeader(null));
     getChurchLocationsHeader().then(setLocationsHeader).catch(() => setLocationsHeader(null));
     getWeeklySongsHeader().then(setSongsHeader).catch(() => setSongsHeader(null));
+    getChurchGroupContactsHeader().then(setGroupContactsHeader).catch(() => setGroupContactsHeader(null));
+    getGivingAccount().then(setGivingAccount).catch(() => setGivingAccount(null));
   }, []);
 
   const closeSession = async () => {
@@ -134,6 +140,30 @@ export default function MoreScreen() {
           </View>
           <View style={styles.flex}>
             <Text style={styles.menuTitle}>{locationsHeader.menu_title}</Text>
+          </View>
+          <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+        </Pressable>
+      ) : null}
+
+      {groupContactsHeader?.menu_title ? (
+        <Pressable onPress={() => router.push("/(tabs)/more/group-contacts" as never)} style={styles.menuItem}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="people" color={colors.gold} size={24} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.menuTitle}>{groupContactsHeader.menu_title}</Text>
+          </View>
+          <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
+        </Pressable>
+      ) : null}
+
+      {givingAccount?.menu_title ? (
+        <Pressable onPress={() => router.push("/(tabs)/more/giving" as never)} style={styles.menuItem}>
+          <View style={styles.menuIcon}>
+            <Ionicons name="qr-code" color={colors.gold} size={24} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.menuTitle}>{givingAccount.menu_title}</Text>
           </View>
           <Ionicons name="chevron-forward" color={colors.textSecondary} size={20} />
         </Pressable>

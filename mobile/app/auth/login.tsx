@@ -12,7 +12,7 @@ import { getLoginErrorMessage } from "@/utils/auth-errors";
 const vendimiaLogo = require("@/assets/vendimia-logo-orange.png");
 
 export default function LoginScreen() {
-  const { signIn, session, loading } = useAuth();
+  const { signIn, session, profile, loading } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [phoneCountryCode, setPhoneCountryCode] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +28,13 @@ export default function LoginScreen() {
       .catch(() => undefined);
   }, []);
 
-  if (!loading && session) return <Redirect href="/(tabs)" />;
+  if (!loading && session) {
+    if (profile && (!profile.church_attendance_time?.trim() || profile.is_being_discipled === null)) {
+      return <Redirect href="/auth/onboarding" />;
+    }
+
+    return <Redirect href="/(tabs)" />;
+  }
 
   const onSubmit = async () => {
     try {

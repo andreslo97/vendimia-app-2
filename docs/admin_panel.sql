@@ -120,6 +120,8 @@ begin
     'leadership_schedule_items',
     'weekly_songs_header',
     'weekly_songs',
+    'church_group_contacts_header',
+    'church_group_contacts',
     'home_featured_song',
     'daily_devotionals',
     'notification_master'
