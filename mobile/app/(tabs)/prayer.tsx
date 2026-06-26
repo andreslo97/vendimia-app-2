@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/hooks/use-auth";
-import { createPrayerRequest, getPrayerData, PrayerData, PrayerRequestItem, togglePrayerLike } from "@/services/prayerService";
+import { createPrayerRequest, getPrayerData, markPrayerRequestAnswered, PrayerData, PrayerRequestItem, togglePrayerLike } from "@/services/prayerService";
 import { colors } from "@/theme/colors";
 import { formatColombiaDate } from "@/utils/colombiaDateTime";
 import { runRefresh } from "@/utils/refresh";
@@ -18,6 +18,7 @@ export default function PrayerScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [activeLikeId, setActiveLikeId] = useState<number | null>(null);
+  const [answeringId, setAnsweringId] = useState<number | null>(null);
 
   const load = async () => {
     if (!user?.id) return;
@@ -61,6 +62,32 @@ export default function PrayerScreen() {
     } finally {
       setActiveLikeId(null);
     }
+  };
+
+  const confirmAnswered = (request: PrayerRequestItem) => {
+    if (!user?.id || request.userId !== user.id) return;
+
+    Alert.alert(
+      "Oración respondida",
+      "Este motivo de oración dejará de visualizarse",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          onPress: async () => {
+            try {
+              setAnsweringId(request.id);
+              await markPrayerRequestAnswered(request.id, user.id);
+              await load();
+            } catch (error) {
+              Alert.alert("Error", error instanceof Error ? error.message : "No fue posible actualizar el motivo.");
+            } finally {
+              setAnsweringId(null);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) {
@@ -118,6 +145,16 @@ export default function PrayerScreen() {
                 </Text>
               </Pressable>
             </View>
+            {request.userId === user?.id ? (
+              <Pressable disabled={answeringId === request.id} onPress={() => confirmAnswered(request)} style={styles.answeredButton}>
+                {answeringId === request.id ? (
+                  <ActivityIndicator color={colors.gold} size="small" />
+                ) : (
+                  <Ionicons name="checkmark-circle" color={colors.gold} size={18} />
+                )}
+                <Text style={styles.answeredText}>Recibí respuesta de mi oración</Text>
+              </Pressable>
+            ) : null}
           </View>
         ))
       ) : data?.content?.empty_text ? (
@@ -149,6 +186,8 @@ const styles = StyleSheet.create({
   likeButton: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 36 },
   likeText: { color: colors.textSecondary, fontSize: 13, fontWeight: "700" },
   likeTextActive: { color: colors.gold },
+  answeredButton: { minHeight: 42, borderRadius: 8, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 12 },
+  answeredText: { color: colors.gold, fontSize: 13, fontWeight: "800", textAlign: "center" },
   emptyCard: { borderRadius: 8, borderWidth: 1, borderColor: colors.line, padding: 18, backgroundColor: colors.cardDark },
   emptyText: { color: colors.textSecondary, fontSize: 14, lineHeight: 21 }
 });

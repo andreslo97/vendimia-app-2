@@ -12,6 +12,7 @@ export type PrayerScreenContent = {
 
 export type PrayerRequestItem = {
   id: number;
+  userId: string;
   body: string;
   created_at: string;
   likeCount: number;
@@ -23,15 +24,13 @@ export type PrayerData = {
   requests: PrayerRequestItem[];
 };
 
-type PrayerRequestRow = {
+type PrayerFeedRow = {
   id: number;
+  user_id: string;
   body: string;
   created_at: string;
-};
-
-type PrayerLikeRow = {
-  request_id: number;
-  user_id: string;
+  like_count: number | string | null;
+  liked_by_me: boolean | null;
 };
 
 const unwrap = <T>(result: { data: T; error: Error | null }) => {
@@ -39,8 +38,28 @@ const unwrap = <T>(result: { data: T; error: Error | null }) => {
   return result.data;
 };
 
+async function logPrayerRequestAction(
+  userId: string,
+  requestId: number,
+  status: "success" | "error" | "not_found",
+  errorMessage?: string,
+  metadata?: Record<string, unknown>
+) {
+  await supabase
+    .from("prayer_request_action_logs")
+    .insert({
+      user_id: userId,
+      request_id: requestId,
+      action: "mark_answered_client",
+      status,
+      error_message: errorMessage ?? null,
+      metadata: metadata ?? {}
+    })
+    .throwOnError();
+}
+
 export async function getPrayerData(userId: string): Promise<PrayerData> {
-  const [contentResult, requestsResult, likesResult] = await Promise.all([
+  const [contentResult, feedResult] = await Promise.all([
     supabase
       .from("prayer_screen_content")
       .select("title,subtitle,input_placeholder,button_text,empty_text,like_text,unlike_text")
@@ -48,35 +67,21 @@ export async function getPrayerData(userId: string): Promise<PrayerData> {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("prayer_requests")
-      .select("id,body,created_at")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false }),
-    supabase.from("prayer_request_likes").select("request_id,user_id")
+    supabase.rpc("get_prayer_feed")
   ]);
 
   const content = unwrap(contentResult);
-  const requests = unwrap(requestsResult) ?? [];
-  const likes = unwrap(likesResult) ?? [];
-  const likeCounts = new Map<number, number>();
-  const likedByMe = new Set<number>();
-
-  (likes as PrayerLikeRow[]).forEach((like) => {
-    likeCounts.set(like.request_id, (likeCounts.get(like.request_id) ?? 0) + 1);
-    if (like.user_id === userId) {
-      likedByMe.add(like.request_id);
-    }
-  });
+  const feed = unwrap(feedResult) ?? [];
 
   return {
     content,
-    requests: (requests as PrayerRequestRow[]).map((request) => ({
+    requests: (feed as PrayerFeedRow[]).map((request) => ({
       id: request.id,
+      userId: request.user_id,
       body: request.body,
       created_at: request.created_at,
-      likeCount: likeCounts.get(request.id) ?? 0,
-      likedByMe: likedByMe.has(request.id)
+      likeCount: Number(request.like_count ?? 0),
+      likedByMe: Boolean(request.liked_by_me)
     }))
   };
 }
@@ -88,6 +93,31 @@ export async function createPrayerRequest(userId: string, body: string) {
   });
 
   if (error) throw error;
+}
+
+export async function markPrayerRequestAnswered(requestId: number, userId: string) {
+  const { data, error } = await supabase.rpc("mark_prayer_request_answered", {
+    target_request_id: requestId
+  });
+
+  if (error) {
+    await logPrayerRequestAction(userId, requestId, "error", error.message, {
+      source: "client",
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    }).catch(() => undefined);
+
+    throw error;
+  }
+
+  if (data === false) {
+    const message = "No encontramos un motivo activo asociado a tu usuario.";
+    await logPrayerRequestAction(userId, requestId, "not_found", message, { source: "client" }).catch(() => undefined);
+    throw new Error(message);
+  }
+
+  await logPrayerRequestAction(userId, requestId, "success", undefined, { source: "client" }).catch(() => undefined);
 }
 
 export async function togglePrayerLike(requestId: number, userId: string, likedByMe: boolean) {
@@ -102,10 +132,16 @@ export async function togglePrayerLike(requestId: number, userId: string, likedB
     return;
   }
 
-  const { error } = await supabase.from("prayer_request_likes").insert({
-    request_id: requestId,
-    user_id: userId
-  });
+  const { error } = await supabase.from("prayer_request_likes").upsert(
+    {
+      request_id: requestId,
+      user_id: userId
+    },
+    {
+      onConflict: "request_id,user_id",
+      ignoreDuplicates: true
+    }
+  );
 
   if (error) throw error;
 }

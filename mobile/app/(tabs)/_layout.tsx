@@ -67,6 +67,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="more/leadership-schedule" options={{ href: null }} />
       <Tabs.Screen name="more/weekly-songs" options={{ href: null }} />
       <Tabs.Screen name="more/group-contacts" options={{ href: null }} />
+      <Tabs.Screen name="more/giving" options={{ href: null }} />
       <Tabs.Screen name="more/locations" options={{ href: null }} />
 
       <Tabs.Screen name="discipulado/devocionales" options={{ href: null }} />
